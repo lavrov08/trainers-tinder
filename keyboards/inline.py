@@ -14,6 +14,9 @@ def get_role_keyboard() -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(text="💪 Я тренер", callback_data="role_trainer")
     )
+    builder.row(
+        InlineKeyboardButton(text="📞 Связаться с администратором", url="https://t.me/a1sheet")
+    )
     return builder.as_markup()
 
 
