@@ -1,0 +1,18 @@
+services:
+  bot:
+    build: .
+    container_name: trainers_tinder_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Монтируем базу данных для сохранения данных
+      - ./data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/trainers_tinder.db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
