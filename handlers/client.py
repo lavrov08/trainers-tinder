@@ -252,9 +252,9 @@ async def process_check_likes(callback: CallbackQuery, db: Database):
 async def process_refill_likes(callback: CallbackQuery):
     """Обработчик запроса на пополнение лайков"""
     # Вычисляем стоимость тарифов
-    tariff_5 = PLACEMENT_COST // 2
-    tariff_15 = PLACEMENT_COST
-    tariff_30 = PLACEMENT_COST * 2
+    tariff_5 = PLACEMENT_COST
+    tariff_15 = PLACEMENT_COST * 2
+    tariff_30 = PLACEMENT_COST * 3
     
     await callback.message.answer(
         "💰 <b>Выберите тариф пополнения:</b>\n\n"
