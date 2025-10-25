@@ -31,11 +31,10 @@ async def cmd_start(message: Message, db: Database, state: FSMContext):
     # Базовое приветствие
     welcome_text = (
         "👋 <b>Добро пожаловать в Tinder для тренеров!</b>\n"
-        "made by <b>@cultphysique</b> \n\n"
+        "<i>made by <b>@cultphysique</b> </i>\n\n"
         "Спасибо, что подписались на нас! 💪\n\n"
         "🎁 <b>Подарок для новых подписчиков:</b>\n"
         "Бесплатная консультация у <b>ЛЮБОГО</b> нашего специалиста по <b>ЛЮБОМУ</b> интересующему вас вопросу!\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
     )
 
     

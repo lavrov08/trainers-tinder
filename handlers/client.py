@@ -302,7 +302,7 @@ async def process_tariff_selection(callback: CallbackQuery, bot: Bot, db: Databa
         f"<b>Тариф:</b> {likes_amount} лайков\n"
         f"<b>Стоимость:</b> {cost} рублей\n\n"
         f"После подтверждения оплаты используйте команду:\n"
-        f"/addlikes {username if username else user_id} {likes_amount}"
+        f"<code>/addlikes {'@' + username if username else user_id} {likes_amount}</code>"
     )
     
     for admin_id in ADMIN_IDS:
