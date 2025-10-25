@@ -1,7 +1,7 @@
 """Работа с базой данных"""
 import aiosqlite
 from typing import Optional, List
-from .models import User, Trainer, Like
+from .models import User, Client, Trainer, Like
 
 
 class Database:
@@ -19,6 +19,16 @@ class Database:
                     user_id INTEGER PRIMARY KEY,
                     username TEXT,
                     role TEXT
+                )
+            """)
+            
+            # Таблица клиентов с лайками
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS clients (
+                    user_id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    likes_count INTEGER DEFAULT 5,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
                 )
             """)
             
@@ -87,6 +97,76 @@ class Database:
                 (role, user_id)
             )
             await db.commit()
+    
+    # === Клиенты ===
+    
+    async def create_client(self, user_id: int, username: Optional[str], initial_likes: int = 5):
+        """Создать клиента с начальным количеством лайков"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO clients (user_id, username, likes_count) VALUES (?, ?, ?)",
+                (user_id, username, initial_likes)
+            )
+            await db.commit()
+    
+    async def get_client(self, user_id: int) -> Optional[Client]:
+        """Получить клиента по ID"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM clients WHERE user_id = ?", (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return Client(**dict(row))
+                return None
+    
+    async def get_client_likes(self, user_id: int) -> int:
+        """Получить количество лайков клиента"""
+        client = await self.get_client(user_id)
+        return client.likes_count if client else 0
+    
+    async def decrease_client_likes(self, user_id: int, amount: int = 1) -> bool:
+        """Уменьшить количество лайков клиента. Возвращает True если успешно"""
+        async with aiosqlite.connect(self.db_path) as db:
+            # Проверяем, достаточно ли лайков
+            async with db.execute(
+                "SELECT likes_count FROM clients WHERE user_id = ?", (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if not row or row[0] < amount:
+                    return False
+            
+            # Уменьшаем
+            await db.execute(
+                "UPDATE clients SET likes_count = likes_count - ? WHERE user_id = ?",
+                (amount, user_id)
+            )
+            await db.commit()
+            return True
+    
+    async def add_client_likes(self, user_id: int, amount: int):
+        """Добавить лайки клиенту"""
+        async with aiosqlite.connect(self.db_path) as db:
+            # Если клиента нет, создаем с указанным количеством
+            await db.execute(
+                "INSERT INTO clients (user_id, likes_count) VALUES (?, ?) "
+                "ON CONFLICT(user_id) DO UPDATE SET likes_count = likes_count + ?",
+                (user_id, amount, amount)
+            )
+            await db.commit()
+    
+    async def get_client_by_username(self, username: str) -> Optional[Client]:
+        """Получить клиента по username"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM clients WHERE username = ?", (username,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return Client(**dict(row))
+                return None
     
     # === Тренеры ===
     

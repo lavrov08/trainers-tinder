@@ -2,6 +2,7 @@
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
+from aiogram.fsm.context import FSMContext
 
 from database import Database
 from keyboards.inline import (
@@ -11,9 +12,11 @@ from keyboards.inline import (
     get_trainers_list_keyboard,
     get_trainer_detail_keyboard,
     get_confirm_delete_keyboard,
-    get_back_to_trainer_keyboard
+    get_back_to_trainer_keyboard,
+    get_cancel_keyboard
 )
 from config import ADMIN_IDS, TRAINING_DIRECTIONS
+from states import AdminAddLikes
 
 router = Router()
 
@@ -24,11 +27,29 @@ def is_admin(user_id: int) -> bool:
 
 
 @router.message(Command("stats"))
-async def cmd_stats(message: Message):
+async def cmd_stats(message: Message, state: FSMContext):
     """Команда просмотра статистики (только для админа)"""
     if not is_admin(message.from_user.id):
         await message.answer("❌ У вас нет доступа к этой команде.")
         return
+    
+    await state.clear()
+    
+    await message.answer(
+        "📊 <b>Панель администратора</b>\n\n"
+        "Выберите действие:",
+        reply_markup=get_admin_stats_keyboard()
+    )
+
+
+@router.message(Command("admin"))
+async def cmd_admin(message: Message, state: FSMContext):
+    """Альтернативная команда для админ-панели"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ У вас нет доступа к этой команде.")
+        return
+    
+    await state.clear()
     
     await message.answer(
         "📊 <b>Панель администратора</b>\n\n"
@@ -421,4 +442,308 @@ async def process_reject(callback: CallbackQuery, bot: Bot, db: Database):
             text=callback.message.text + "\n\n❌ <b>ОТКЛОНЕНО</b>"
         )
     await callback.answer("❌ Анкета отклонена!", show_alert=True)
+
+
+# === Управление лайками клиентов ===
+
+@router.callback_query(F.data == "admin_add_likes")
+async def process_admin_add_likes_button(callback: CallbackQuery, state: FSMContext):
+    """Обработчик кнопки 'Начислить лайки'"""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("❌ Недостаточно прав", show_alert=True)
+        return
+    
+    await callback.message.edit_text(
+        "💰 <b>Начисление лайков клиенту</b>\n\n"
+        "Введите username клиента (с @) или его User ID:\n\n"
+        "Например:\n"
+        "<code>@john_doe</code>\n"
+        "или\n"
+        "<code>123456789</code>",
+        reply_markup=get_cancel_keyboard()
+    )
+    await state.set_state(AdminAddLikes.waiting_for_user)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_cancel")
+async def process_admin_cancel(callback: CallbackQuery, state: FSMContext):
+    """Обработчик отмены операции"""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("❌ Недостаточно прав", show_alert=True)
+        return
+    
+    await state.clear()
+    
+    await callback.message.edit_text(
+        "📊 <b>Панель администратора</b>\n\n"
+        "Операция отменена. Выберите действие:",
+        reply_markup=get_admin_stats_keyboard()
+    )
+    await callback.answer()
+
+
+@router.message(AdminAddLikes.waiting_for_user)
+async def process_admin_user_input(message: Message, state: FSMContext, db: Database):
+    """Обработчик ввода username или user_id"""
+    if not is_admin(message.from_user.id):
+        return
+    
+    user_identifier = message.text.strip()
+    
+    # Определяем, username или user_id
+    client = None
+    if user_identifier.startswith("@"):
+        # Это username
+        username = user_identifier[1:]  # Убираем @
+        client = await db.get_client_by_username(username)
+        if not client:
+            await message.answer(
+                f"❌ Клиент с username @{username} не найден.\n\n"
+                "Убедитесь, что пользователь уже использовал бота.\n"
+                "Попробуйте еще раз или нажмите кнопку 'Отмена':",
+                reply_markup=get_cancel_keyboard()
+            )
+            return
+        user_id = client.user_id
+    else:
+        # Это user_id
+        try:
+            user_id = int(user_identifier)
+            client = await db.get_client(user_id)
+            if not client:
+                await message.answer(
+                    f"❌ Клиент с ID {user_id} не найден.\n\n"
+                    "Убедитесь, что пользователь уже использовал бота.\n"
+                    "Попробуйте еще раз или нажмите кнопку 'Отмена':",
+                    reply_markup=get_cancel_keyboard()
+                )
+                return
+        except ValueError:
+            await message.answer(
+                "❌ Неверный формат.\n\n"
+                "Введите username (с @) или числовой User ID.\n"
+                "Попробуйте еще раз или нажмите кнопку 'Отмена':",
+                reply_markup=get_cancel_keyboard()
+            )
+            return
+    
+    # Сохраняем данные и переходим к следующему шагу
+    current_likes = await db.get_client_likes(user_id)
+    await state.update_data(
+        user_identifier=user_identifier,
+        user_id=user_id,
+        current_likes=current_likes
+    )
+    await state.set_state(AdminAddLikes.waiting_for_amount)
+    
+    await message.answer(
+        f"✅ Клиент найден: {user_identifier}\n"
+        f"Текущий баланс: <b>{current_likes}</b> лайков\n\n"
+        f"Введите количество лайков для начисления:",
+        reply_markup=get_cancel_keyboard()
+    )
+
+
+@router.message(AdminAddLikes.waiting_for_amount)
+async def process_admin_amount_input(message: Message, state: FSMContext, bot: Bot, db: Database):
+    """Обработчик ввода количества лайков"""
+    if not is_admin(message.from_user.id):
+        return
+    
+    try:
+        likes_amount = int(message.text.strip())
+        if likes_amount <= 0:
+            await message.answer(
+                "❌ Количество лайков должно быть положительным числом.\n"
+                "Попробуйте еще раз или нажмите кнопку 'Отмена':",
+                reply_markup=get_cancel_keyboard()
+            )
+            return
+    except ValueError:
+        await message.answer(
+            "❌ Количество лайков должно быть числом.\n"
+            "Попробуйте еще раз или нажмите кнопку 'Отмена':",
+            reply_markup=get_cancel_keyboard()
+        )
+        return
+    
+    # Получаем данные из state
+    data = await state.get_data()
+    user_identifier = data['user_identifier']
+    user_id = data['user_id']
+    
+    # Начисляем лайки
+    await db.add_client_likes(user_id, likes_amount)
+    new_balance = await db.get_client_likes(user_id)
+    
+    await state.clear()
+    
+    # Уведомляем админа
+    await message.answer(
+        f"✅ <b>Лайки успешно начислены!</b>\n\n"
+        f"Пользователь: {user_identifier}\n"
+        f"Начислено: <b>+{likes_amount}</b> лайков\n"
+        f"Новый баланс: <b>{new_balance}</b> лайков",
+        reply_markup=get_admin_stats_keyboard()
+    )
+    
+    # Уведомляем клиента
+    try:
+        await bot.send_message(
+            user_id,
+            f"🎉 <b>Ваш баланс лайков пополнен!</b>\n\n"
+            f"Начислено: <b>+{likes_amount}</b> лайков\n"
+            f"Текущий баланс: <b>{new_balance}</b> лайков\n\n"
+            f"Продолжайте искать своего идеального тренера!"
+        )
+    except Exception as e:
+        await message.answer(f"⚠️ Не удалось отправить уведомление клиенту: {e}")
+
+
+@router.callback_query(F.data == "admin_pending_trainers")
+async def process_admin_pending_trainers(callback: CallbackQuery, db: Database):
+    """Обработчик кнопки 'Проверить анкеты на модерации'"""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("❌ Недостаточно прав", show_alert=True)
+        return
+    
+    pending_trainers = await db.get_pending_trainers()
+    
+    if not pending_trainers:
+        await callback.message.edit_text(
+            "📋 <b>Анкеты на модерации</b>\n\n"
+            "Нет анкет, ожидающих модерации.",
+            reply_markup=get_admin_stats_keyboard()
+        )
+        await callback.answer()
+        return
+    
+    await callback.message.edit_text(
+        f"📋 <b>Анкеты на модерации</b>\n\n"
+        f"Всего анкет: {len(pending_trainers)}\n\n"
+        f"Анкеты отправлены вам в чат."
+    )
+    
+    # Отправляем каждую анкету отдельным сообщением
+    for trainer in pending_trainers:
+        admin_text = (
+            "🆕 <b>Анкета тренера на модерации</b>\n\n"
+            f"<b>Имя:</b> {trainer.name}\n"
+            f"<b>Возраст:</b> {trainer.age} лет\n"
+            f"<b>Опыт:</b> {trainer.experience}\n"
+            f"<b>Направление:</b> {trainer.direction}\n\n"
+            f"<b>О себе:</b>\n{trainer.about}\n\n"
+            f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
+            f"<b>User ID:</b> {trainer.user_id}"
+        )
+        
+        try:
+            if trainer.photo_id:
+                await callback.message.answer_photo(
+                    photo=trainer.photo_id,
+                    caption=admin_text,
+                    reply_markup=get_moderation_keyboard(trainer.id)
+                )
+            else:
+                await callback.message.answer(
+                    admin_text,
+                    reply_markup=get_moderation_keyboard(trainer.id)
+                )
+        except Exception as e:
+            print(f"Ошибка отправки анкеты {trainer.id}: {e}")
+    
+    # В конце отправляем кнопку возврата
+    await callback.message.answer(
+        "Все анкеты на модерации показаны выше ☝️",
+        reply_markup=get_admin_stats_keyboard()
+    )
+    await callback.answer()
+
+
+@router.message(Command("addlikes"))
+async def cmd_add_likes(message: Message, bot: Bot, db: Database):
+    """Команда для начисления лайков клиенту (только для админа)"""
+    if not is_admin(message.from_user.id):
+        await message.answer("❌ У вас нет доступа к этой команде.")
+        return
+    
+    # Парсим аргументы команды: /addlikes @username 15 или /addlikes user_id 15
+    args = message.text.split()
+    
+    if len(args) < 3:
+        await message.answer(
+            "❌ <b>Неверный формат команды</b>\n\n"
+            "Используйте:\n"
+            "<code>/addlikes @username количество</code>\n"
+            "или\n"
+            "<code>/addlikes user_id количество</code>\n\n"
+            "Например:\n"
+            "<code>/addlikes @john_doe 15</code>\n"
+            "<code>/addlikes 123456789 15</code>"
+        )
+        return
+    
+    user_identifier = args[1]
+    
+    try:
+        likes_amount = int(args[2])
+        if likes_amount <= 0:
+            await message.answer("❌ Количество лайков должно быть положительным числом.")
+            return
+    except ValueError:
+        await message.answer("❌ Количество лайков должно быть числом.")
+        return
+    
+    # Определяем, username или user_id
+    client = None
+    if user_identifier.startswith("@"):
+        # Это username
+        username = user_identifier[1:]  # Убираем @
+        client = await db.get_client_by_username(username)
+        if not client:
+            await message.answer(
+                f"❌ Клиент с username @{username} не найден.\n\n"
+                "Убедитесь, что пользователь уже использовал бота."
+            )
+            return
+        user_id = client.user_id
+    else:
+        # Это user_id
+        try:
+            user_id = int(user_identifier)
+            client = await db.get_client(user_id)
+            if not client:
+                await message.answer(
+                    f"❌ Клиент с ID {user_id} не найден.\n\n"
+                    "Убедитесь, что пользователь уже использовал бота."
+                )
+                return
+        except ValueError:
+            await message.answer("❌ Неверный формат user_id.")
+            return
+    
+    # Начисляем лайки
+    await db.add_client_likes(user_id, likes_amount)
+    new_balance = await db.get_client_likes(user_id)
+    
+    # Уведомляем админа
+    await message.answer(
+        f"✅ <b>Лайки начислены!</b>\n\n"
+        f"Пользователь: {user_identifier}\n"
+        f"Начислено: +{likes_amount} лайков\n"
+        f"Новый баланс: {new_balance} лайков"
+    )
+    
+    # Уведомляем клиента
+    try:
+        await bot.send_message(
+            user_id,
+            f"🎉 <b>Ваш баланс лайков пополнен!</b>\n\n"
+            f"Начислено: <b>+{likes_amount}</b> лайков\n"
+            f"Текущий баланс: <b>{new_balance}</b> лайков\n\n"
+            f"Продолжайте искать своего идеального тренера!"
+        )
+    except Exception as e:
+        await message.answer(f"⚠️ Не удалось отправить уведомление клиенту: {e}")
 

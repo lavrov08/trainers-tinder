@@ -72,7 +72,19 @@ def get_trainer_view_keyboard(
         )
         builder.row(*nav_buttons)
     
-    # Третий ряд: возврат к выбору направления
+    # Третий ряд: управление лайками
+    builder.row(
+        InlineKeyboardButton(
+            text="💖 Мои лайки",
+            callback_data="check_likes"
+        ),
+        InlineKeyboardButton(
+            text="➕ Пополнить",
+            callback_data="refill_likes"
+        )
+    )
+    
+    # Четвертый ряд: возврат к выбору направления
     builder.row(
         InlineKeyboardButton(
             text="🔙 К выбору направления",
@@ -124,6 +136,18 @@ def get_admin_stats_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(
             text="👥 Все тренеры",
             callback_data="admin_all_trainers"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="💰 Начислить лайки",
+            callback_data="admin_add_likes"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="📋 Проверить анкеты на модерации",
+            callback_data="admin_pending_trainers"
         )
     )
     return builder.as_markup()
@@ -251,6 +275,48 @@ def get_back_to_trainer_keyboard(trainer_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(
             text="🔙 Назад к анкете",
             callback_data=f"admin_trainer:{trainer_id}"
+        )
+    )
+    return builder.as_markup()
+
+
+def get_refill_tariffs_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора тарифа пополнения лайков"""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="5 лайков",
+            callback_data="tariff:5"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="15 лайков",
+            callback_data="tariff:15"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="30 лайков",
+            callback_data="tariff:30"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="🔙 Отмена",
+            callback_data="cancel_refill"
+        )
+    )
+    return builder.as_markup()
+
+
+def get_cancel_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура отмены операции"""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="❌ Отмена",
+            callback_data="admin_cancel"
         )
     )
     return builder.as_markup()

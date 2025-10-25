@@ -12,6 +12,14 @@ class User:
 
 
 @dataclass
+class Client:
+    """Клиент с балансом лайков"""
+    user_id: int
+    username: Optional[str]
+    likes_count: int
+
+
+@dataclass
 class Trainer:
     """Анкета тренера"""
     id: Optional[int]

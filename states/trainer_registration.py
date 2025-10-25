@@ -11,3 +11,9 @@ class TrainerRegistration(StatesGroup):
     waiting_for_about = State()
     waiting_for_photo = State()
 
+
+class AdminAddLikes(StatesGroup):
+    """Состояния для начисления лайков админом"""
+    waiting_for_user = State()
+    waiting_for_amount = State()
+

@@ -1,5 +1,5 @@
 """States package"""
-from .trainer_registration import TrainerRegistration
+from .trainer_registration import TrainerRegistration, AdminAddLikes
 
-__all__ = ['TrainerRegistration']
+__all__ = ['TrainerRegistration', 'AdminAddLikes']
 

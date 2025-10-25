@@ -4,7 +4,8 @@ from aiogram.types import CallbackQuery, InputMediaPhoto
 from aiogram.fsm.context import FSMContext
 
 from database import Database
-from keyboards.inline import get_directions_keyboard, get_trainer_view_keyboard
+from keyboards.inline import get_directions_keyboard, get_trainer_view_keyboard, get_refill_tariffs_keyboard
+from config import ADMIN_IDS, PLACEMENT_COST
 
 router = Router()
 
@@ -156,10 +157,27 @@ async def process_like(callback: CallbackQuery, bot: Bot, db: Database, state: F
         await callback.answer("Вы уже лайкнули этого тренера!", show_alert=True)
         return
     
-    # Добавляем лайк
-    success = await db.add_like(client_id, client_username, trainer_id)
+    # Проверяем количество лайков
+    likes_count = await db.get_client_likes(client_id)
+    if likes_count < 1:
+        await callback.answer(
+            "❌ У вас закончились лайки!\n\n"
+            "Используйте кнопку 'Пополнить лайки' для продолжения.",
+            show_alert=True
+        )
+        return
     
-    if success:
+    # Уменьшаем количество лайков
+    success = await db.decrease_client_likes(client_id, 1)
+    
+    if not success:
+        await callback.answer("❌ Недостаточно лайков!", show_alert=True)
+        return
+    
+    # Добавляем лайк
+    like_success = await db.add_like(client_id, client_username, trainer_id)
+    
+    if like_success:
         # Получаем информацию о тренере
         trainer = await db.get_trainer_by_id(trainer_id)
         
@@ -177,11 +195,20 @@ async def process_like(callback: CallbackQuery, bot: Bot, db: Database, state: F
             except Exception:
                 pass  # Если не удалось отправить (например, бот заблокирован)
         
-        await callback.answer("❤️ Лайк отправлен! Тренер получит ваш контакт.", show_alert=True)
+        # Получаем новое количество лайков
+        new_likes_count = await db.get_client_likes(client_id)
+        
+        await callback.answer(
+            f"❤️ Лайк отправлен! Тренер получит ваш контакт.\n\n"
+            f"Осталось лайков: {new_likes_count}",
+            show_alert=True
+        )
         
         # Обновляем клавиатуру
         await show_trainer(callback.message, db, state, client_id)
     else:
+        # Если не удалось добавить лайк, возвращаем лайк обратно
+        await db.add_client_likes(client_id, 1)
         await callback.answer("❌ Ошибка при добавлении лайка.", show_alert=True)
 
 
@@ -207,4 +234,89 @@ async def process_back_to_directions(callback: CallbackQuery, state: FSMContext)
         reply_markup=get_directions_keyboard(prefix="client_direction")
     )
     await callback.answer()
+
+
+@router.callback_query(F.data == "check_likes")
+async def process_check_likes(callback: CallbackQuery, db: Database):
+    """Обработчик проверки количества лайков"""
+    user_id = callback.from_user.id
+    likes_count = await db.get_client_likes(user_id)
+    
+    await callback.answer(
+        f"💖 У вас {likes_count} лайков",
+        show_alert=True
+    )
+
+
+@router.callback_query(F.data == "refill_likes")
+async def process_refill_likes(callback: CallbackQuery):
+    """Обработчик запроса на пополнение лайков"""
+    # Вычисляем стоимость тарифов
+    tariff_5 = PLACEMENT_COST // 2
+    tariff_15 = PLACEMENT_COST
+    tariff_30 = PLACEMENT_COST * 2
+    
+    await callback.message.answer(
+        "💰 <b>Выберите тариф пополнения:</b>\n\n"
+        f"🔹 <b>5 лайков</b> — {tariff_5} рублей\n"
+        f"🔹 <b>15 лайков</b> — {tariff_15} рублей\n"
+        f"🔹 <b>30 лайков</b> — {tariff_30} рублей\n\n"
+        "После выбора тарифа с вами свяжется менеджер для оплаты.",
+        reply_markup=get_refill_tariffs_keyboard()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("tariff:"))
+async def process_tariff_selection(callback: CallbackQuery, bot: Bot, db: Database):
+    """Обработчик выбора тарифа"""
+    likes_amount = int(callback.data.split(":", 1)[1])
+    user_id = callback.from_user.id
+    username = callback.from_user.username
+    
+    # Вычисляем стоимость
+    if likes_amount == 5:
+        cost = PLACEMENT_COST // 2
+    elif likes_amount == 15:
+        cost = PLACEMENT_COST
+    elif likes_amount == 30:
+        cost = PLACEMENT_COST * 2
+    else:
+        await callback.answer("❌ Неверный тариф", show_alert=True)
+        return
+    
+    # Отправляем уведомление клиенту
+    await callback.message.edit_text(
+        f"✅ <b>Запрос на пополнение отправлен!</b>\n\n"
+        f"Тариф: <b>{likes_amount} лайков</b> за {cost} рублей\n\n"
+        f"Менеджер свяжется с вами в ближайшее время для оплаты.\n"
+        f"После подтверждения оплаты лайки будут начислены автоматически."
+    )
+    
+    # Отправляем уведомление всем админам
+    contact_info = f"@{username}" if username else f"ID: {user_id}"
+    admin_text = (
+        "💰 <b>Запрос на пополнение лайков</b>\n\n"
+        f"<b>Пользователь:</b> {contact_info}\n"
+        f"<b>User ID:</b> <code>{user_id}</code>\n"
+        f"<b>Тариф:</b> {likes_amount} лайков\n"
+        f"<b>Стоимость:</b> {cost} рублей\n\n"
+        f"После подтверждения оплаты используйте команду:\n"
+        f"/addlikes {username if username else user_id} {likes_amount}"
+    )
+    
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(admin_id, admin_text)
+        except Exception as e:
+            print(f"Ошибка отправки админу {admin_id}: {e}")
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data == "cancel_refill")
+async def process_cancel_refill(callback: CallbackQuery):
+    """Обработчик отмены пополнения"""
+    await callback.message.delete()
+    await callback.answer("Отменено")
 
