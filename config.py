@@ -29,6 +29,9 @@ ADMIN_ID = ADMIN_IDS[0] if ADMIN_IDS else 0
 # Путь к базе данных
 DATABASE_PATH = os.getenv("DATABASE_PATH", "trainers_tinder.db")
 
+# Стоимость размещения анкеты в месяц (в рублях)
+PLACEMENT_COST = int(os.getenv("PLACEMENT_COST", "100"))
+
 # Список направлений тренировок
 TRAINING_DIRECTIONS = [
     "Фитнес",

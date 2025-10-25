@@ -7,7 +7,7 @@ from database import Database
 from database.models import Trainer
 from keyboards.inline import get_skip_photo_keyboard, get_moderation_keyboard
 from states import TrainerRegistration
-from config import ADMIN_IDS
+from config import ADMIN_IDS, PLACEMENT_COST
 
 router = Router()
 
@@ -192,7 +192,9 @@ async def submit_trainer_profile(message: Message, bot: Bot, state: FSMContext, 
         "✅ <b>Анкета создана!</b>\n\n"
         "Ваша анкета отправлена на модерацию администратору.\n"
         "Вы получите уведомление, когда анкета будет рассмотрена.\n\n"
-        "После одобрения вы начнете получать уведомления о лайках от клиентов!"
+        "Менеджер свяжется с вами для оплаты размещения анкеты. \n"
+        f"Стоимость размещения {PLACEMENT_COST} рублей в месяц.\n"
+        "После одобрения и оплаты вы начнете получать уведомления о лайках от клиентов!"
     )
     
     # Отправляем анкету всем админам на модерацию
