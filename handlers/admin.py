@@ -627,13 +627,19 @@ async def process_admin_pending_trainers(callback: CallbackQuery, db: Database):
     
     # Отправляем каждую анкету отдельным сообщением
     for trainer in pending_trainers:
+        # Обрезаем длинное описание для caption (лимит Telegram: 4096 символов)
+        max_about_length = 3000  # Оставляем место для остального текста
+        about_text = trainer.about
+        if len(about_text) > max_about_length:
+            about_text = about_text[:max_about_length] + "..."
+        
         admin_text = (
             "🆕 <b>Анкета тренера на модерации</b>\n\n"
             f"<b>Имя:</b> {trainer.name}\n"
             f"<b>Возраст:</b> {trainer.age} лет\n"
             f"<b>Опыт:</b> {trainer.experience}\n"
             f"<b>Направление:</b> {trainer.direction}\n\n"
-            f"<b>О себе:</b>\n{trainer.about}\n\n"
+            f"<b>О себе:</b>\n{about_text}\n\n"
             f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
             f"<b>User ID:</b> {trainer.user_id}"
         )
@@ -652,6 +658,14 @@ async def process_admin_pending_trainers(callback: CallbackQuery, db: Database):
                 )
         except Exception as e:
             print(f"Ошибка отправки анкеты {trainer.id}: {e}")
+            # Если все еще ошибка с длиной, отправляем без фото
+            try:
+                await callback.message.answer(
+                    admin_text,
+                    reply_markup=get_moderation_keyboard(trainer.id)
+                )
+            except Exception as e2:
+                print(f"Критическая ошибка отправки анкеты {trainer.id}: {e2}")
     
     # В конце отправляем кнопку возврата
     await callback.message.answer(

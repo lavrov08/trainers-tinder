@@ -199,13 +199,19 @@ async def submit_trainer_profile(message: Message, bot: Bot, state: FSMContext, 
     
     # Отправляем анкету всем админам на модерацию
     if ADMIN_IDS:
+        # Обрезаем длинное описание для caption (лимит Telegram: 4096 символов)
+        max_about_length = 3000  # Оставляем место для остального текста
+        about_text = trainer.about
+        if len(about_text) > max_about_length:
+            about_text = about_text[:max_about_length] + "..."
+        
         admin_text = (
             "🆕 <b>Новая анкета тренера на модерации</b>\n\n"
             f"<b>Имя:</b> {trainer.name}\n"
             f"<b>Возраст:</b> {trainer.age} лет\n"
             f"<b>Опыт:</b> {trainer.experience}\n"
             f"<b>Направление:</b> {trainer.direction}\n\n"
-            f"<b>О себе:</b>\n{trainer.about}\n\n"
+            f"<b>О себе:</b>\n{about_text}\n\n"
             f"<b>Username:</b> @{username if username else 'не указан'}\n"
             f"<b>User ID:</b> {user_id}"
         )
@@ -227,4 +233,13 @@ async def submit_trainer_profile(message: Message, bot: Bot, state: FSMContext, 
                     )
             except Exception as e:
                 print(f"Ошибка отправки админу {admin_id}: {e}")
+                # Если ошибка с длиной caption, отправляем без фото
+                try:
+                    await bot.send_message(
+                        admin_id,
+                        admin_text,
+                        reply_markup=get_moderation_keyboard(trainer_id)
+                    )
+                except Exception as e2:
+                    print(f"Критическая ошибка отправки админу {admin_id}: {e2}")
 
