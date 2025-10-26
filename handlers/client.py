@@ -70,16 +70,21 @@ async def send_trainer_card_smart(message, trainer, current_index: int, total: i
                 previous_message_id = data.get('current_message_id')
                 previous_main_message_id = data.get('current_main_message_id')
                 
-                if previous_message_id:
-                    try:
-                        await message.bot.delete_message(message.chat.id, previous_message_id)
-                    except Exception:
-                        pass
+                print(f"DEBUG: Удаляем сообщения - main: {previous_main_message_id}, about: {previous_message_id}")
+                
                 if previous_main_message_id:
                     try:
                         await message.bot.delete_message(message.chat.id, previous_main_message_id)
-                    except Exception:
-                        pass
+                        print(f"DEBUG: Успешно удалено основное сообщение {previous_main_message_id}")
+                    except Exception as e:
+                        print(f"DEBUG: Ошибка удаления основного сообщения {previous_main_message_id}: {e}")
+                
+                if previous_message_id:
+                    try:
+                        await message.bot.delete_message(message.chat.id, previous_message_id)
+                        print(f"DEBUG: Успешно удалено сообщение с кнопками {previous_message_id}")
+                    except Exception as e:
+                        print(f"DEBUG: Ошибка удаления сообщения с кнопками {previous_message_id}: {e}")
             
             # Отправляем фото с основной информацией
             main_message = await message.answer_photo(
@@ -332,16 +337,21 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int, s
                     previous_message_id = data.get('current_message_id')
                     previous_main_message_id = data.get('current_main_message_id')
                     
-                    if previous_message_id:
-                        try:
-                            await message.bot.delete_message(message.chat.id, previous_message_id)
-                        except Exception:
-                            pass
+                    print(f"DEBUG: Удаляем сообщения (без фото) - main: {previous_main_message_id}, about: {previous_message_id}")
+                    
                     if previous_main_message_id:
                         try:
                             await message.bot.delete_message(message.chat.id, previous_main_message_id)
-                        except Exception:
-                            pass
+                            print(f"DEBUG: Успешно удалено основное сообщение (без фото) {previous_main_message_id}")
+                        except Exception as e:
+                            print(f"DEBUG: Ошибка удаления основного сообщения (без фото) {previous_main_message_id}: {e}")
+                    
+                    if previous_message_id:
+                        try:
+                            await message.bot.delete_message(message.chat.id, previous_message_id)
+                            print(f"DEBUG: Успешно удалено сообщение с кнопками (без фото) {previous_message_id}")
+                        except Exception as e:
+                            print(f"DEBUG: Ошибка удаления сообщения с кнопками (без фото) {previous_message_id}: {e}")
                 
                 # Отправляем основную часть
                 main_message = await message.answer(main_text)

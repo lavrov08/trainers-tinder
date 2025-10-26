@@ -486,6 +486,28 @@ async def process_approve(callback: CallbackQuery, bot: Bot, db: Database):
         await callback.message.edit_text(
             text=callback.message.text + "\n\n✅ <b>ОДОБРЕНО</b>"
         )
+    
+    # Если это сообщение с "О себе" (второе сообщение), обновляем и первое
+    if "О себе:" in callback.message.text:
+        try:
+            # Ищем предыдущее сообщение в чате (основное сообщение с анкетой)
+            chat_id = callback.message.chat.id
+            message_id = callback.message.message_id
+            
+            # Пытаемся найти и обновить предыдущее сообщение
+            # Это работает только если сообщения идут подряд
+            try:
+                previous_message = await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id - 1,
+                    text=callback.message.text.replace("О себе:", "О себе:").replace("\n\n✅ <b>ОДОБРЕНО</b>", "") + "\n\n✅ <b>ОДОБРЕНО</b>"
+                )
+            except Exception:
+                # Если не удалось найти предыдущее сообщение, игнорируем
+                pass
+        except Exception as e:
+            print(f"Ошибка обновления предыдущего сообщения: {e}")
+    
     await callback.answer("✅ Анкета одобрена!", show_alert=True)
 
 
@@ -538,6 +560,28 @@ async def process_reject(callback: CallbackQuery, bot: Bot, db: Database):
         await callback.message.edit_text(
             text=callback.message.text + "\n\n❌ <b>ОТКЛОНЕНО</b>"
         )
+    
+    # Если это сообщение с "О себе" (второе сообщение), обновляем и первое
+    if "О себе:" in callback.message.text:
+        try:
+            # Ищем предыдущее сообщение в чате (основное сообщение с анкетой)
+            chat_id = callback.message.chat.id
+            message_id = callback.message.message_id
+            
+            # Пытаемся найти и обновить предыдущее сообщение
+            # Это работает только если сообщения идут подряд
+            try:
+                previous_message = await bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id - 1,
+                    text=callback.message.text.replace("О себе:", "О себе:").replace("\n\n❌ <b>ОТКЛОНЕНО</b>", "") + "\n\n❌ <b>ОТКЛОНЕНО</b>"
+                )
+            except Exception:
+                # Если не удалось найти предыдущее сообщение, игнорируем
+                pass
+        except Exception as e:
+            print(f"Ошибка обновления предыдущего сообщения: {e}")
+    
     await callback.answer("❌ Анкета отклонена!", show_alert=True)
 
 
