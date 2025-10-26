@@ -324,3 +324,45 @@ def get_cancel_keyboard() -> InlineKeyboardMarkup:
     )
     return builder.as_markup()
 
+
+def get_trainer_profile_keyboard(trainer_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура для управления анкетой тренера"""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="👁 Посмотреть анкету",
+            callback_data=f"view_my_profile:{trainer_id}"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="🗑 Удалить анкету",
+            callback_data=f"delete_my_profile:{trainer_id}"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="🔙 Главное меню",
+            callback_data="back_to_main"
+        )
+    )
+    return builder.as_markup()
+
+
+def get_confirm_delete_my_profile_keyboard(trainer_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура подтверждения удаления собственной анкеты"""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="✅ Да, удалить анкету",
+            callback_data=f"confirm_delete_my_profile:{trainer_id}"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="❌ Отмена",
+            callback_data=f"view_my_profile:{trainer_id}"
+        )
+    )
+    return builder.as_markup()
+

@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 
 from database import Database
 from database.models import Trainer
-from keyboards.inline import get_skip_photo_keyboard, get_moderation_keyboard
+from keyboards.inline import get_skip_photo_keyboard, get_moderation_keyboard, get_trainer_profile_keyboard, get_confirm_delete_my_profile_keyboard, get_role_keyboard
 from states import TrainerRegistration
 from config import ADMIN_IDS, PLACEMENT_COST
 
@@ -258,4 +258,145 @@ async def submit_trainer_profile(message: Message, bot: Bot, state: FSMContext, 
                     )
                 except Exception as e2:
                     print(f"Критическая ошибка отправки админу {admin_id}: {e2}")
+
+
+@router.callback_query(F.data.startswith("view_my_profile:"))
+async def view_my_profile(callback: CallbackQuery, db: Database):
+    """Обработчик просмотра собственной анкеты тренера"""
+    trainer_id = int(callback.data.split(":", 1)[1])
+    user_id = callback.from_user.id
+    
+    # Получаем анкету тренера
+    trainer = await db.get_trainer_by_id(trainer_id)
+    
+    if not trainer:
+        await callback.message.edit_text("❌ Анкета не найдена.")
+        await callback.answer()
+        return
+    
+    # Проверяем, что это анкета текущего пользователя
+    if trainer.user_id != user_id:
+        await callback.message.edit_text("❌ У вас нет доступа к этой анкете.")
+        await callback.answer()
+        return
+    
+    # Формируем текст анкеты
+    profile_text = (
+        f"👤 <b>Ваша анкета</b>\n\n"
+        f"<b>Имя:</b> {trainer.name}\n"
+        f"<b>Возраст:</b> {trainer.age} лет\n"
+        f"<b>Направление:</b> {trainer.direction}\n"
+        f"<b>Опыт:</b> {trainer.experience}\n\n"
+        f"<b>О себе:</b>\n{trainer.about}\n\n"
+        f"<b>Статус:</b> {'✅ Одобрена' if trainer.status == 'approved' else '⏳ На модерации' if trainer.status == 'pending' else '❌ Отклонена'}"
+    )
+    
+    try:
+        if trainer.photo_id:
+            await callback.message.delete()
+            await callback.message.answer_photo(
+                photo=trainer.photo_id,
+                caption=profile_text,
+                reply_markup=get_trainer_profile_keyboard(trainer_id)
+            )
+        else:
+            await callback.message.edit_text(
+                profile_text,
+                reply_markup=get_trainer_profile_keyboard(trainer_id)
+            )
+    except Exception as e:
+        print(f"Ошибка при отправке анкеты: {e}")
+        await callback.message.edit_text(
+            profile_text,
+            reply_markup=get_trainer_profile_keyboard(trainer_id)
+        )
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("delete_my_profile:"))
+async def delete_my_profile(callback: CallbackQuery, db: Database):
+    """Обработчик запроса на удаление собственной анкеты"""
+    trainer_id = int(callback.data.split(":", 1)[1])
+    user_id = callback.from_user.id
+    
+    # Получаем анкету тренера
+    trainer = await db.get_trainer_by_id(trainer_id)
+    
+    if not trainer:
+        await callback.message.edit_text("❌ Анкета не найдена.")
+        await callback.answer()
+        return
+    
+    # Проверяем, что это анкета текущего пользователя
+    if trainer.user_id != user_id:
+        await callback.message.edit_text("❌ У вас нет доступа к этой анкете.")
+        await callback.answer()
+        return
+    
+    await callback.message.edit_text(
+        "⚠️ <b>Внимание!</b>\n\n"
+        "Вы действительно хотите удалить свою анкету?\n\n"
+        "После удаления:\n"
+        "• Анкета будет полностью удалена из системы\n"
+        "• Все лайки от клиентов будут потеряны\n"
+        "• Вам придется создавать новую анкету с нуля\n\n"
+        "Это действие нельзя отменить!",
+        reply_markup=get_confirm_delete_my_profile_keyboard(trainer_id)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("confirm_delete_my_profile:"))
+async def confirm_delete_my_profile(callback: CallbackQuery, db: Database):
+    """Обработчик подтверждения удаления собственной анкеты"""
+    trainer_id = int(callback.data.split(":", 1)[1])
+    user_id = callback.from_user.id
+    
+    # Получаем анкету тренера
+    trainer = await db.get_trainer_by_id(trainer_id)
+    
+    if not trainer:
+        await callback.message.edit_text("❌ Анкета не найдена.")
+        await callback.answer()
+        return
+    
+    # Проверяем, что это анкета текущего пользователя
+    if trainer.user_id != user_id:
+        await callback.message.edit_text("❌ У вас нет доступа к этой анкете.")
+        await callback.answer()
+        return
+    
+    try:
+        # Удаляем анкету
+        await db.delete_trainer(trainer_id)
+        
+        await callback.message.edit_text(
+            "✅ <b>Анкета успешно удалена!</b>\n\n"
+            "Ваша анкета была полностью удалена из системы.\n"
+            "Если захотите создать новую анкету, просто выберите роль тренера снова.",
+            reply_markup=get_role_keyboard()
+        )
+    except Exception as e:
+        print(f"Ошибка при удалении анкеты: {e}")
+        await callback.message.edit_text(
+            "❌ Произошла ошибка при удалении анкеты. Попробуйте позже."
+        )
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_main")
+async def back_to_main_menu(callback: CallbackQuery):
+    """Обработчик возврата в главное меню"""
+    await callback.message.edit_text(
+        "👋 <b>Добро пожаловать в Tinder для тренеров!</b>\n"
+        "<i>made by <b>@cultphysique</b> </i>\n\n"
+        "Спасибо, что подписались на нас! 💪\n\n"
+        "🎁 <b>Подарок для новых подписчиков:</b>\n"
+        "Бесплатная консультация у <b>ЛЮБОГО</b> нашего специалиста по <b>ЛЮБОМУ</b> интересующему вас вопросу!\n\n"
+        "Выберите свою роль:",
+        reply_markup=get_role_keyboard()
+    )
+    await callback.answer()
 

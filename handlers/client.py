@@ -10,7 +10,7 @@ from config import ADMIN_IDS, PLACEMENT_COST
 router = Router()
 
 
-async def send_trainer_card_smart(message, trainer, current_index: int, total: int, keyboard):
+async def send_trainer_card_smart(message, trainer, current_index: int, total: int, keyboard, should_delete_previous=False):
     """Умная отправка анкеты тренера с разделением по полю 'О себе'"""
     # Создаем основной текст без поля "О себе"
     main_text = (
@@ -33,7 +33,8 @@ async def send_trainer_card_smart(message, trainer, current_index: int, total: i
                     reply_markup=keyboard
                 )
             else:
-                await message.delete()
+                if should_delete_previous:
+                    await message.delete()
                 await message.answer_photo(
                     photo=trainer.photo_id,
                     caption=full_text,
@@ -43,7 +44,7 @@ async def send_trainer_card_smart(message, trainer, current_index: int, total: i
             print(f"Ошибка отправки анкеты тренера {trainer.id}: {e}")
             # В случае ошибки отправляем без фото
             try:
-                if message.photo:
+                if message.photo and should_delete_previous:
                     await message.delete()
                 await message.answer(full_text, reply_markup=keyboard)
             except Exception as e2:
@@ -52,17 +53,14 @@ async def send_trainer_card_smart(message, trainer, current_index: int, total: i
     else:
         # Если не помещается - отправляем основную часть с фото, описание отдельно
         try:
-            if message.photo:
-                await message.edit_media(
-                    media=InputMediaPhoto(media=trainer.photo_id, caption=main_text),
-                    reply_markup=None  # Без кнопок на основном сообщении
-                )
-            else:
+            if should_delete_previous:
                 await message.delete()
-                await message.answer_photo(
-                    photo=trainer.photo_id,
-                    caption=main_text
-                )
+            
+            # Отправляем фото с основной информацией
+            await message.answer_photo(
+                photo=trainer.photo_id,
+                caption=main_text
+            )
             
             # Отправляем описание отдельным сообщением с кнопками
             await message.answer(
@@ -73,8 +71,6 @@ async def send_trainer_card_smart(message, trainer, current_index: int, total: i
             print(f"Ошибка отправки анкеты тренера {trainer.id}: {e}")
             # В случае ошибки отправляем все текстом
             try:
-                if message.photo:
-                    await message.delete()
                 await message.answer(full_text, reply_markup=keyboard)
             except Exception as e2:
                 print(f"Критическая ошибка отправки анкеты тренера {trainer.id}: {e2}")
@@ -110,7 +106,7 @@ def split_text_for_caption(text: str, max_length: int = 4000) -> list[str]:
     return parts
 
 
-async def send_text_with_photo(message, photo_id: str, text: str, keyboard=None, max_length: int = 4000):
+async def send_text_with_photo(message, photo_id: str, text: str, keyboard=None, max_length: int = 4000, should_delete_previous=False):
     """Отправляет текст с фото, разбивая длинный текст на части"""
     text_parts = split_text_for_caption(text, max_length)
     
@@ -123,7 +119,8 @@ async def send_text_with_photo(message, photo_id: str, text: str, keyboard=None,
                     reply_markup=keyboard
                 )
             else:
-                await message.delete()
+                if should_delete_previous:
+                    await message.delete()
                 await message.answer_photo(
                     photo=photo_id,
                     caption=text,
@@ -132,13 +129,13 @@ async def send_text_with_photo(message, photo_id: str, text: str, keyboard=None,
         except Exception as e:
             print(f"Ошибка отправки с фото: {e}")
             # Fallback - отправляем без фото
-            if message.photo:
+            if message.photo and should_delete_previous:
                 await message.delete()
             await message.answer(text, reply_markup=keyboard)
     else:
         # Длинный текст - отправляем частями
         try:
-            if message.photo:
+            if should_delete_previous:
                 await message.delete()
             
             # Отправляем фото с первой частью текста
@@ -159,7 +156,7 @@ async def send_text_with_photo(message, photo_id: str, text: str, keyboard=None,
         except Exception as e:
             print(f"Ошибка отправки частями: {e}")
             # Fallback - отправляем все как обычные сообщения
-            if message.photo:
+            if should_delete_previous:
                 await message.delete()
             
             for i, part in enumerate(text_parts):
@@ -230,7 +227,7 @@ async def process_client_direction(callback: CallbackQuery, db: Database, state:
     await callback.answer()
 
 
-async def show_trainer(message, db: Database, state: FSMContext, user_id: int):
+async def show_trainer(message, db: Database, state: FSMContext, user_id: int, should_delete_previous=False):
     """Показать анкету тренера"""
     data = await state.get_data()
     trainers_ids = data.get("trainers", [])
@@ -260,7 +257,7 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int):
     
     # Если есть фото, используем умную отправку
     if trainer.photo_id:
-        await send_trainer_card_smart(message, trainer, current_index, len(trainers_ids), keyboard)
+        await send_trainer_card_smart(message, trainer, current_index, len(trainers_ids), keyboard, should_delete_previous)
     else:
         # Без фото - используем умную отправку текста
         text = await format_trainer_card(trainer, current_index, len(trainers_ids))
@@ -270,10 +267,11 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int):
             # Короткий текст - отправляем одним сообщением
             try:
                 if message.photo:
-                    await message.delete()
-                    await message.answer(text, reply_markup=keyboard)
-                else:
                     await message.edit_text(text, reply_markup=keyboard)
+                else:
+                    if should_delete_previous:
+                        await message.delete()
+                    await message.answer(text, reply_markup=keyboard)
             except Exception:
                 await message.answer(text, reply_markup=keyboard)
         else:
@@ -287,7 +285,7 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int):
             )
             
             try:
-                if message.photo:
+                if should_delete_previous:
                     await message.delete()
                 
                 # Отправляем основную часть
@@ -314,7 +312,7 @@ async def process_next_trainer(callback: CallbackQuery, db: Database, state: FSM
     new_index = (current_index + 1) % len(trainers_ids)
     await state.update_data(current_index=new_index)
     
-    await show_trainer(callback.message, db, state, callback.from_user.id)
+    await show_trainer(callback.message, db, state, callback.from_user.id, should_delete_previous=True)
     await callback.answer()
 
 
@@ -329,7 +327,7 @@ async def process_prev_trainer(callback: CallbackQuery, db: Database, state: FSM
     new_index = (current_index - 1) % len(trainers_ids)
     await state.update_data(current_index=new_index)
     
-    await show_trainer(callback.message, db, state, callback.from_user.id)
+    await show_trainer(callback.message, db, state, callback.from_user.id, should_delete_previous=True)
     await callback.answer()
 
 
@@ -395,7 +393,7 @@ async def process_like(callback: CallbackQuery, bot: Bot, db: Database, state: F
         )
         
         # Обновляем клавиатуру
-        await show_trainer(callback.message, db, state, client_id)
+        await show_trainer(callback.message, db, state, client_id, should_delete_previous=False)
     else:
         # Если не удалось добавить лайк, возвращаем лайк обратно
         await db.add_client_likes(client_id, 1)

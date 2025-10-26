@@ -5,7 +5,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 from database import Database
-from keyboards.inline import get_role_keyboard, get_directions_keyboard
+from keyboards.inline import get_role_keyboard, get_directions_keyboard, get_trainer_profile_keyboard
 from states import TrainerRegistration
 from config import ADMIN_IDS
 
@@ -102,7 +102,9 @@ async def process_trainer_role(callback: CallbackQuery, db: Database, state: FSM
         elif existing_trainer.status == "approved":
             await callback.message.edit_text(
                 "✅ Ваша анкета уже одобрена и активна!\n\n"
-                "Вы будете получать уведомления, когда клиенты лайкают вашу анкету."
+                "Вы будете получать уведомления, когда клиенты лайкают вашу анкету.\n\n"
+                "Что хотите сделать?",
+                reply_markup=get_trainer_profile_keyboard(existing_trainer.id)
             )
         elif existing_trainer.status == "rejected":
             await callback.message.edit_text(
