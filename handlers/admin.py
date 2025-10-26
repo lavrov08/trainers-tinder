@@ -455,6 +455,14 @@ async def process_approve(callback: CallbackQuery, bot: Bot, db: Database):
         await callback.answer("❌ Анкета не найдена", show_alert=True)
         return
     
+    # Проверяем текущий статус анкеты
+    if trainer.status != "pending":
+        if trainer.status == "approved":
+            await callback.answer("⚠️ Эта анкета уже была одобрена другим администратором!", show_alert=True)
+        elif trainer.status == "rejected":
+            await callback.answer("⚠️ Эта анкета уже была отклонена другим администратором!", show_alert=True)
+        return
+    
     # Обновляем статус
     await db.update_trainer_status(trainer_id, "approved")
     
@@ -493,6 +501,14 @@ async def process_reject(callback: CallbackQuery, bot: Bot, db: Database):
     
     if not trainer:
         await callback.answer("❌ Анкета не найдена", show_alert=True)
+        return
+    
+    # Проверяем текущий статус анкеты
+    if trainer.status != "pending":
+        if trainer.status == "approved":
+            await callback.answer("⚠️ Эта анкета уже была одобрена другим администратором!", show_alert=True)
+        elif trainer.status == "rejected":
+            await callback.answer("⚠️ Эта анкета уже была отклонена другим администратором!", show_alert=True)
         return
     
     # Обновляем статус
