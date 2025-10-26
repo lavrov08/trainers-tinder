@@ -4,7 +4,7 @@ from aiogram.types import CallbackQuery, InputMediaPhoto
 from aiogram.fsm.context import FSMContext
 
 from database import Database
-from keyboards.inline import get_directions_keyboard, get_trainer_view_keyboard, get_refill_tariffs_keyboard
+from keyboards.inline import get_directions_keyboard, get_trainer_view_keyboard, get_refill_tariffs_keyboard, get_role_keyboard
 from config import ADMIN_IDS, PLACEMENT_COST
 
 router = Router()
@@ -279,7 +279,7 @@ async def process_client_direction(callback: CallbackQuery, db: Database, state:
         await callback.message.edit_text(
             f"😔 К сожалению, пока нет тренеров в направлении <b>{direction}</b>.\n\n"
             "Попробуйте выбрать другое направление:",
-            reply_markup=get_directions_keyboard(prefix="client_direction")
+            reply_markup=get_directions_keyboard(prefix="client_direction", show_back_button=True)
         )
         await callback.answer()
         return
@@ -569,8 +569,45 @@ async def process_back_to_directions(callback: CallbackQuery, state: FSMContext)
     )
     await callback.answer()
 
-
-@router.callback_query(F.data == "check_likes")
+@router.callback_query(F.data == "back_to_main_menu")
+async def process_back_to_main_menu(callback: CallbackQuery, state: FSMContext):
+    """Обработчик возврата в главное меню"""
+    # Получаем данные перед очисткой состояния
+    data = await state.get_data()
+    previous_message_id = data.get('previous_message_id') or data.get('current_message_id')
+    previous_main_message_id = data.get('previous_main_message_id') or data.get('current_main_message_id')
+    
+    # Очищаем состояние
+    await state.clear()
+    
+    # Удаляем все предыдущие сообщения если они есть
+    if previous_message_id:
+        try:
+            await callback.message.bot.delete_message(callback.message.chat.id, previous_message_id)
+        except Exception:
+            pass
+    if previous_main_message_id:
+        try:
+            await callback.message.bot.delete_message(callback.message.chat.id, previous_main_message_id)
+        except Exception:
+            pass
+    
+    # Удаляем старое сообщение если оно с фото
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    
+    await callback.message.answer(
+        "👋 <b>Добро пожаловать в Tinder для тренеров!</b>\n"
+        "<i>made by <b>@cultphysique</b> </i>\n\n"
+        "Спасибо, что подписались на нас! 💪\n\n"
+        "🎁 <b>Подарок для новых подписчиков:</b>\n"
+        "Бесплатная консультация у <b>ЛЮБОГО</b> нашего специалиста по <b>ЛЮБОМУ</b> интересующему вас вопросу!\n\n"
+        "Выберите свою роль:",
+        reply_markup=get_role_keyboard()
+    )
+    await callback.answer()
 async def process_check_likes(callback: CallbackQuery, db: Database):
     """Обработчик проверки количества лайков"""
     user_id = callback.from_user.id

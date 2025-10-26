@@ -20,7 +20,7 @@ def get_role_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_directions_keyboard(prefix: str = "direction") -> InlineKeyboardMarkup:
+def get_directions_keyboard(prefix: str = "direction", show_back_button: bool = False) -> InlineKeyboardMarkup:
     """Клавиатура выбора направления тренировок"""
     builder = InlineKeyboardBuilder()
     for direction in TRAINING_DIRECTIONS:
@@ -30,6 +30,16 @@ def get_directions_keyboard(prefix: str = "direction") -> InlineKeyboardMarkup:
                 callback_data=f"{prefix}:{direction}"
             )
         )
+    
+    # Добавляем кнопку возврата в главное меню, если нужно
+    if show_back_button:
+        builder.row(
+            InlineKeyboardButton(
+                text="🔙 Главное меню",
+                callback_data="back_to_main_menu"
+            )
+        )
+    
     return builder.as_markup()
 
 
