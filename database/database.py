@@ -171,19 +171,42 @@ class Database:
     # === Тренеры ===
     
     async def create_trainer(self, trainer: Trainer) -> int:
-        """Создать анкету тренера"""
+        """Создать или обновить анкету тренера"""
         async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute("""
-                INSERT INTO trainers 
-                (user_id, username, direction, name, age, experience, about, photo_id, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                trainer.user_id, trainer.username, trainer.direction,
-                trainer.name, trainer.age, trainer.experience,
-                trainer.about, trainer.photo_id, trainer.status
-            ))
-            await db.commit()
-            return cursor.lastrowid
+            # Проверяем, есть ли уже анкета у этого пользователя
+            async with db.execute(
+                "SELECT id FROM trainers WHERE user_id = ?", (trainer.user_id,)
+            ) as cursor:
+                existing = await cursor.fetchone()
+            
+            if existing:
+                # Обновляем существующую анкету
+                trainer_id = existing[0]
+                await db.execute("""
+                    UPDATE trainers 
+                    SET username = ?, direction = ?, name = ?, age = ?, 
+                        experience = ?, about = ?, photo_id = ?, status = ?
+                    WHERE user_id = ?
+                """, (
+                    trainer.username, trainer.direction, trainer.name, 
+                    trainer.age, trainer.experience, trainer.about, 
+                    trainer.photo_id, trainer.status, trainer.user_id
+                ))
+                await db.commit()
+                return trainer_id
+            else:
+                # Создаем новую анкету
+                cursor = await db.execute("""
+                    INSERT INTO trainers 
+                    (user_id, username, direction, name, age, experience, about, photo_id, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    trainer.user_id, trainer.username, trainer.direction,
+                    trainer.name, trainer.age, trainer.experience,
+                    trainer.about, trainer.photo_id, trainer.status
+                ))
+                await db.commit()
+                return cursor.lastrowid
     
     async def get_trainer_by_user_id(self, user_id: int) -> Optional[Trainer]:
         """Получить анкету тренера по user_id"""
