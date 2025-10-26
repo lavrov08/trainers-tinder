@@ -12,12 +12,31 @@ router = Router()
 
 async def format_trainer_card(trainer, current_index: int, total: int) -> str:
     """Форматирование анкеты тренера"""
+    # Создаем базовый текст без поля "О себе"
+    base_text = (
+        f"<b>{trainer.name}</b>\n"
+        f"Возраст: {trainer.age} лет\n"
+        f"Опыт: {trainer.experience}\n"
+        f"Направление: {trainer.direction}\n\n"
+        f"<b>О себе:</b>\n"
+        f"Анкета {current_index + 1}/{total}"
+    )
+    
+    # Рассчитываем доступное место для описания
+    max_caption_length = 4096
+    available_length = max_caption_length - len(base_text) - 10  # 10 символов запас
+    
+    # Обрезаем описание если нужно
+    about_text = trainer.about
+    if len(about_text) > available_length:
+        about_text = about_text[:available_length] + "..."
+    
     return (
         f"<b>{trainer.name}</b>\n"
         f"Возраст: {trainer.age} лет\n"
         f"Опыт: {trainer.experience}\n"
         f"Направление: {trainer.direction}\n\n"
-        f"<b>О себе:</b>\n{trainer.about}\n\n"
+        f"<b>О себе:</b>\n{about_text}\n\n"
         f"Анкета {current_index + 1}/{total}"
     )
 
@@ -83,7 +102,14 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int):
     # Если есть фото, отправляем с фото
     if trainer.photo_id:
         try:
-            if message.photo:
+            # Дополнительная проверка общей длины текста
+            if len(text) > 4096:
+                print(f"Предупреждение: текст анкеты тренера {trainer.id} превышает 4096 символов: {len(text)}")
+                # Если текст слишком длинный, отправляем без фото
+                if message.photo:
+                    await message.delete()
+                await message.answer(text, reply_markup=keyboard)
+            elif message.photo:
                 # Если сообщение уже содержит фото, обновляем его
                 await message.edit_media(
                     media=InputMediaPhoto(media=trainer.photo_id, caption=text),
@@ -97,9 +123,18 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int):
                     caption=text,
                     reply_markup=keyboard
                 )
-        except Exception:
+        except Exception as e:
+            print(f"Ошибка отправки анкеты тренера {trainer.id}: {e}")
             # В случае ошибки отправляем текстом
-            await message.edit_text(text, reply_markup=keyboard)
+            try:
+                if message.photo:
+                    await message.delete()
+                    await message.answer(text, reply_markup=keyboard)
+                else:
+                    await message.edit_text(text, reply_markup=keyboard)
+            except Exception as e2:
+                print(f"Критическая ошибка отправки анкеты тренера {trainer.id}: {e2}")
+                await message.answer(text, reply_markup=keyboard)
     else:
         # Без фото
         try:

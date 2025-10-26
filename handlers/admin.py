@@ -236,6 +236,29 @@ async def show_trainer_detail(callback: CallbackQuery, db: Database, trainer_id:
     
     likes = await db.get_trainer_likes(trainer_id)
     
+    # Создаем базовый текст без поля "О себе"
+    base_text = (
+        f"👤 <b>Детали анкеты</b>\n\n"
+        f"<b>Имя:</b> {trainer.name}\n"
+        f"<b>Возраст:</b> {trainer.age} лет\n"
+        f"<b>Опыт:</b> {trainer.experience}\n"
+        f"<b>Направление:</b> {trainer.direction}\n"
+        f"<b>Статус:</b> {trainer.status}\n"
+        f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
+        f"<b>User ID:</b> {trainer.user_id}\n\n"
+        f"<b>О себе:</b>\n"
+        f"<b>Количество лайков:</b> {len(likes)}"
+    )
+    
+    # Рассчитываем доступное место для описания
+    max_caption_length = 4096
+    available_length = max_caption_length - len(base_text) - 10  # 10 символов запас
+    
+    # Обрезаем описание если нужно
+    about_text = trainer.about
+    if len(about_text) > available_length:
+        about_text = about_text[:available_length] + "..."
+    
     text = (
         f"👤 <b>Детали анкеты</b>\n\n"
         f"<b>Имя:</b> {trainer.name}\n"
@@ -245,7 +268,7 @@ async def show_trainer_detail(callback: CallbackQuery, db: Database, trainer_id:
         f"<b>Статус:</b> {trainer.status}\n"
         f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
         f"<b>User ID:</b> {trainer.user_id}\n\n"
-        f"<b>О себе:</b>\n{trainer.about}\n\n"
+        f"<b>О себе:</b>\n{about_text}\n\n"
         f"<b>Количество лайков:</b> {len(likes)}"
     )
     
@@ -253,15 +276,27 @@ async def show_trainer_detail(callback: CallbackQuery, db: Database, trainer_id:
     
     if trainer.photo_id:
         try:
-            # Удаляем старое сообщение и отправляем новое с фото
-            await callback.message.delete()
-            await callback.message.answer_photo(
-                photo=trainer.photo_id,
-                caption=text,
-                reply_markup=keyboard
-            )
-        except Exception:
-            await callback.message.edit_text(text, reply_markup=keyboard)
+            # Дополнительная проверка общей длины текста
+            if len(text) > 4096:
+                print(f"Предупреждение: текст деталей тренера {trainer.id} превышает 4096 символов: {len(text)}")
+                # Если текст слишком длинный, отправляем без фото
+                await callback.message.delete()
+                await callback.message.answer(text, reply_markup=keyboard)
+            else:
+                # Удаляем старое сообщение и отправляем новое с фото
+                await callback.message.delete()
+                await callback.message.answer_photo(
+                    photo=trainer.photo_id,
+                    caption=text,
+                    reply_markup=keyboard
+                )
+        except Exception as e:
+            print(f"Ошибка отправки деталей тренера {trainer.id}: {e}")
+            try:
+                await callback.message.edit_text(text, reply_markup=keyboard)
+            except Exception as e2:
+                print(f"Критическая ошибка отправки деталей тренера {trainer.id}: {e2}")
+                await callback.message.answer(text, reply_markup=keyboard)
     else:
         await callback.message.edit_text(text, reply_markup=keyboard)
     
