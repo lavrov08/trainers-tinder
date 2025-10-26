@@ -199,69 +199,61 @@ async def submit_trainer_profile(message: Message, bot: Bot, state: FSMContext, 
     
     # Отправляем анкету всем админам на модерацию
     if ADMIN_IDS:
-        # Создаем базовый текст без поля "О себе"
-        base_text = (
+        # Создаем основной текст без поля "О себе"
+        main_text = (
             "🆕 <b>Новая анкета тренера на модерации</b>\n\n"
             f"<b>Имя:</b> {trainer.name}\n"
             f"<b>Возраст:</b> {trainer.age} лет\n"
             f"<b>Опыт:</b> {trainer.experience}\n"
             f"<b>Направление:</b> {trainer.direction}\n\n"
-            f"<b>О себе:</b>\n"
             f"<b>Username:</b> @{username if username else 'не указан'}\n"
             f"<b>User ID:</b> {user_id}"
         )
         
-        # Рассчитываем доступное место для описания
-        max_caption_length = 4096
-        available_length = max_caption_length - len(base_text) - 10  # 10 символов запас
-        
-        # Обрезаем описание если нужно
-        about_text = trainer.about
-        if len(about_text) > available_length:
-            about_text = about_text[:available_length] + "..."
-        
-        admin_text = (
-            "🆕 <b>Новая анкета тренера на модерации</b>\n\n"
-            f"<b>Имя:</b> {trainer.name}\n"
-            f"<b>Возраст:</b> {trainer.age} лет\n"
-            f"<b>Опыт:</b> {trainer.experience}\n"
-            f"<b>Направление:</b> {trainer.direction}\n\n"
-            f"<b>О себе:</b>\n{about_text}\n\n"
-            f"<b>Username:</b> @{username if username else 'не указан'}\n"
-            f"<b>User ID:</b> {user_id}"
-        )
+        # Проверяем, помещается ли основной текст + описание в лимит
+        full_text = main_text + f"\n\n<b>О себе:</b>\n{trainer.about}"
         
         for admin_id in ADMIN_IDS:
             try:
-                # Дополнительная проверка общей длины текста
-                if len(admin_text) > 4096:
-                    print(f"Предупреждение: текст анкеты {trainer_id} превышает 4096 символов: {len(admin_text)}")
-                    # Если текст все еще слишком длинный, отправляем без фото
-                    await bot.send_message(
-                        admin_id,
-                        admin_text,
-                        reply_markup=get_moderation_keyboard(trainer_id)
-                    )
-                elif trainer.photo_id:
-                    await bot.send_photo(
-                        admin_id,
-                        photo=trainer.photo_id,
-                        caption=admin_text,
-                        reply_markup=get_moderation_keyboard(trainer_id)
-                    )
+                if len(full_text) <= 1024:
+                    # Если помещается - отправляем одним сообщением
+                    if trainer.photo_id:
+                        await bot.send_photo(
+                            admin_id,
+                            photo=trainer.photo_id,
+                            caption=full_text,
+                            reply_markup=get_moderation_keyboard(trainer_id)
+                        )
+                    else:
+                        await bot.send_message(
+                            admin_id,
+                            full_text,
+                            reply_markup=get_moderation_keyboard(trainer_id)
+                        )
                 else:
+                    # Если не помещается - отправляем основную часть с фото, описание отдельно
+                    if trainer.photo_id:
+                        await bot.send_photo(
+                            admin_id,
+                            photo=trainer.photo_id,
+                            caption=main_text
+                        )
+                    else:
+                        await bot.send_message(admin_id, main_text)
+                    
+                    # Отправляем описание отдельным сообщением с кнопками
                     await bot.send_message(
                         admin_id,
-                        admin_text,
+                        f"<b>О себе:</b>\n{trainer.about}",
                         reply_markup=get_moderation_keyboard(trainer_id)
                     )
             except Exception as e:
                 print(f"Ошибка отправки админу {admin_id}: {e}")
-                # Если ошибка с длиной caption, отправляем без фото
+                # В случае ошибки отправляем все текстом
                 try:
                     await bot.send_message(
                         admin_id,
-                        admin_text,
+                        full_text,
                         reply_markup=get_moderation_keyboard(trainer_id)
                     )
                 except Exception as e2:

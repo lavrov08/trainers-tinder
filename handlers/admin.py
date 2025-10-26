@@ -21,6 +21,62 @@ from states import AdminAddLikes
 router = Router()
 
 
+async def send_admin_trainer_card_smart(message, trainer, keyboard):
+    """Умная отправка анкеты тренера для админа с разделением по полю 'О себе'"""
+    # Создаем основной текст без поля "О себе"
+    main_text = (
+        "🆕 <b>Анкета тренера на модерации</b>\n\n"
+        f"<b>Имя:</b> {trainer.name}\n"
+        f"<b>Возраст:</b> {trainer.age} лет\n"
+        f"<b>Опыт:</b> {trainer.experience}\n"
+        f"<b>Направление:</b> {trainer.direction}\n\n"
+        f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
+        f"<b>User ID:</b> {trainer.user_id}"
+    )
+    
+    # Проверяем, помещается ли основной текст + описание в лимит
+    full_text = main_text + f"\n\n<b>О себе:</b>\n{trainer.about}"
+    
+    if len(full_text) <= 1024:
+        # Если помещается - отправляем одним сообщением
+        try:
+            if trainer.photo_id:
+                await message.answer_photo(
+                    photo=trainer.photo_id,
+                    caption=full_text,
+                    reply_markup=keyboard
+                )
+            else:
+                await message.answer(
+                    full_text,
+                    reply_markup=keyboard
+                )
+        except Exception as e:
+            print(f"Ошибка отправки анкеты {trainer.id}: {e}")
+            # В случае ошибки отправляем без фото
+            await message.answer(full_text, reply_markup=keyboard)
+    else:
+        # Если не помещается - отправляем основную часть с фото, описание отдельно
+        try:
+            if trainer.photo_id:
+                await message.answer_photo(
+                    photo=trainer.photo_id,
+                    caption=main_text
+                )
+            else:
+                await message.answer(main_text)
+            
+            # Отправляем описание отдельным сообщением с кнопками
+            await message.answer(
+                f"<b>О себе:</b>\n{trainer.about}",
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            print(f"Ошибка отправки анкеты {trainer.id}: {e}")
+            # В случае ошибки отправляем все текстом
+            await message.answer(full_text, reply_markup=keyboard)
+
+
 def is_admin(user_id: int) -> bool:
     """Проверка, является ли пользователь администратором"""
     return user_id in ADMIN_IDS
@@ -236,8 +292,8 @@ async def show_trainer_detail(callback: CallbackQuery, db: Database, trainer_id:
     
     likes = await db.get_trainer_likes(trainer_id)
     
-    # Создаем базовый текст без поля "О себе"
-    base_text = (
+    # Создаем основной текст без поля "О себе"
+    main_text = (
         f"👤 <b>Детали анкеты</b>\n\n"
         f"<b>Имя:</b> {trainer.name}\n"
         f"<b>Возраст:</b> {trainer.age} лет\n"
@@ -246,59 +302,49 @@ async def show_trainer_detail(callback: CallbackQuery, db: Database, trainer_id:
         f"<b>Статус:</b> {trainer.status}\n"
         f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
         f"<b>User ID:</b> {trainer.user_id}\n\n"
-        f"<b>О себе:</b>\n"
         f"<b>Количество лайков:</b> {len(likes)}"
     )
     
-    # Рассчитываем доступное место для описания
-    max_caption_length = 4096
-    available_length = max_caption_length - len(base_text) - 10  # 10 символов запас
-    
-    # Обрезаем описание если нужно
-    about_text = trainer.about
-    if len(about_text) > available_length:
-        about_text = about_text[:available_length] + "..."
-    
-    text = (
-        f"👤 <b>Детали анкеты</b>\n\n"
-        f"<b>Имя:</b> {trainer.name}\n"
-        f"<b>Возраст:</b> {trainer.age} лет\n"
-        f"<b>Опыт:</b> {trainer.experience}\n"
-        f"<b>Направление:</b> {trainer.direction}\n"
-        f"<b>Статус:</b> {trainer.status}\n"
-        f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
-        f"<b>User ID:</b> {trainer.user_id}\n\n"
-        f"<b>О себе:</b>\n{about_text}\n\n"
-        f"<b>Количество лайков:</b> {len(likes)}"
-    )
+    # Проверяем, помещается ли основной текст + описание в лимит
+    full_text = main_text + f"\n\n<b>О себе:</b>\n{trainer.about}"
     
     keyboard = get_trainer_detail_keyboard(trainer_id, from_direction)
     
-    if trainer.photo_id:
+    if len(full_text) <= 1024:
+        # Если помещается - отправляем одним сообщением
         try:
-            # Дополнительная проверка общей длины текста
-            if len(text) > 4096:
-                print(f"Предупреждение: текст деталей тренера {trainer.id} превышает 4096 символов: {len(text)}")
-                # Если текст слишком длинный, отправляем без фото
-                await callback.message.delete()
-                await callback.message.answer(text, reply_markup=keyboard)
-            else:
-                # Удаляем старое сообщение и отправляем новое с фото
-                await callback.message.delete()
+            await callback.message.delete()
+            if trainer.photo_id:
                 await callback.message.answer_photo(
                     photo=trainer.photo_id,
-                    caption=text,
+                    caption=full_text,
                     reply_markup=keyboard
                 )
+            else:
+                await callback.message.answer(full_text, reply_markup=keyboard)
         except Exception as e:
             print(f"Ошибка отправки деталей тренера {trainer.id}: {e}")
-            try:
-                await callback.message.edit_text(text, reply_markup=keyboard)
-            except Exception as e2:
-                print(f"Критическая ошибка отправки деталей тренера {trainer.id}: {e2}")
-                await callback.message.answer(text, reply_markup=keyboard)
+            await callback.message.answer(full_text, reply_markup=keyboard)
     else:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        # Если не помещается - отправляем основную часть с фото, описание отдельно
+        try:
+            await callback.message.delete()
+            if trainer.photo_id:
+                await callback.message.answer_photo(
+                    photo=trainer.photo_id,
+                    caption=main_text
+                )
+            else:
+                await callback.message.answer(main_text)
+            
+            # Отправляем описание отдельным сообщением с кнопками
+            await callback.message.answer(
+                f"<b>О себе:</b>\n{trainer.about}",
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            print(f"Ошибка отправки деталей тренера {trainer.id}: {e}")
+            await callback.message.answer(full_text, reply_markup=keyboard)
     
     await callback.answer()
 
@@ -662,68 +708,8 @@ async def process_admin_pending_trainers(callback: CallbackQuery, db: Database):
     
     # Отправляем каждую анкету отдельным сообщением
     for trainer in pending_trainers:
-        # Создаем базовый текст без поля "О себе"
-        base_text = (
-            "🆕 <b>Анкета тренера на модерации</b>\n\n"
-            f"<b>Имя:</b> {trainer.name}\n"
-            f"<b>Возраст:</b> {trainer.age} лет\n"
-            f"<b>Опыт:</b> {trainer.experience}\n"
-            f"<b>Направление:</b> {trainer.direction}\n\n"
-            f"<b>О себе:</b>\n"
-            f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
-            f"<b>User ID:</b> {trainer.user_id}"
-        )
-        
-        # Рассчитываем доступное место для описания
-        max_caption_length = 4096
-        available_length = max_caption_length - len(base_text) - 10  # 10 символов запас
-        
-        # Обрезаем описание если нужно
-        about_text = trainer.about
-        if len(about_text) > available_length:
-            about_text = about_text[:available_length] + "..."
-        
-        admin_text = (
-            "🆕 <b>Анкета тренера на модерации</b>\n\n"
-            f"<b>Имя:</b> {trainer.name}\n"
-            f"<b>Возраст:</b> {trainer.age} лет\n"
-            f"<b>Опыт:</b> {trainer.experience}\n"
-            f"<b>Направление:</b> {trainer.direction}\n\n"
-            f"<b>О себе:</b>\n{about_text}\n\n"
-            f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
-            f"<b>User ID:</b> {trainer.user_id}"
-        )
-        
-        try:
-            # Дополнительная проверка общей длины текста
-            if len(admin_text) > 4096:
-                print(f"Предупреждение: текст анкеты {trainer.id} превышает 4096 символов: {len(admin_text)}")
-                # Если текст все еще слишком длинный, отправляем без фото
-                await callback.message.answer(
-                    admin_text,
-                    reply_markup=get_moderation_keyboard(trainer.id)
-                )
-            elif trainer.photo_id:
-                await callback.message.answer_photo(
-                    photo=trainer.photo_id,
-                    caption=admin_text,
-                    reply_markup=get_moderation_keyboard(trainer.id)
-                )
-            else:
-                await callback.message.answer(
-                    admin_text,
-                    reply_markup=get_moderation_keyboard(trainer.id)
-                )
-        except Exception as e:
-            print(f"Ошибка отправки анкеты {trainer.id}: {e}")
-            # Если все еще ошибка с длиной, отправляем без фото
-            try:
-                await callback.message.answer(
-                    admin_text,
-                    reply_markup=get_moderation_keyboard(trainer.id)
-                )
-            except Exception as e2:
-                print(f"Критическая ошибка отправки анкеты {trainer.id}: {e2}")
+        keyboard = get_moderation_keyboard(trainer.id)
+        await send_admin_trainer_card_smart(callback.message, trainer, keyboard)
     
     # В конце отправляем кнопку возврата
     await callback.message.answer(

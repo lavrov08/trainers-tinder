@@ -10,6 +10,166 @@ from config import ADMIN_IDS, PLACEMENT_COST
 router = Router()
 
 
+async def send_trainer_card_smart(message, trainer, current_index: int, total: int, keyboard):
+    """Умная отправка анкеты тренера с разделением по полю 'О себе'"""
+    # Создаем основной текст без поля "О себе"
+    main_text = (
+        f"<b>{trainer.name}</b>\n"
+        f"Возраст: {trainer.age} лет\n"
+        f"Опыт: {trainer.experience}\n"
+        f"Направление: {trainer.direction}\n\n"
+        f"Анкета {current_index + 1}/{total}"
+    )
+    
+    # Проверяем, помещается ли основной текст + описание в лимит
+    full_text = main_text + f"\n\n<b>О себе:</b>\n{trainer.about}"
+    
+    if len(full_text) <= 1024:
+        # Если помещается - отправляем одним сообщением
+        try:
+            if message.photo:
+                await message.edit_media(
+                    media=InputMediaPhoto(media=trainer.photo_id, caption=full_text),
+                    reply_markup=keyboard
+                )
+            else:
+                await message.delete()
+                await message.answer_photo(
+                    photo=trainer.photo_id,
+                    caption=full_text,
+                    reply_markup=keyboard
+                )
+        except Exception as e:
+            print(f"Ошибка отправки анкеты тренера {trainer.id}: {e}")
+            # В случае ошибки отправляем без фото
+            try:
+                if message.photo:
+                    await message.delete()
+                await message.answer(full_text, reply_markup=keyboard)
+            except Exception as e2:
+                print(f"Критическая ошибка отправки анкеты тренера {trainer.id}: {e2}")
+                await message.answer(full_text, reply_markup=keyboard)
+    else:
+        # Если не помещается - отправляем основную часть с фото, описание отдельно
+        try:
+            if message.photo:
+                await message.edit_media(
+                    media=InputMediaPhoto(media=trainer.photo_id, caption=main_text),
+                    reply_markup=None  # Без кнопок на основном сообщении
+                )
+            else:
+                await message.delete()
+                await message.answer_photo(
+                    photo=trainer.photo_id,
+                    caption=main_text
+                )
+            
+            # Отправляем описание отдельным сообщением с кнопками
+            await message.answer(
+                f"<b>О себе:</b>\n{trainer.about}",
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            print(f"Ошибка отправки анкеты тренера {trainer.id}: {e}")
+            # В случае ошибки отправляем все текстом
+            try:
+                if message.photo:
+                    await message.delete()
+                await message.answer(full_text, reply_markup=keyboard)
+            except Exception as e2:
+                print(f"Критическая ошибка отправки анкеты тренера {trainer.id}: {e2}")
+                await message.answer(full_text, reply_markup=keyboard)
+
+
+def split_text_for_caption(text: str, max_length: int = 4000) -> list[str]:
+    """Разбивает текст на части для отправки в нескольких сообщениях"""
+    if len(text) <= max_length:
+        return [text]
+    
+    parts = []
+    current_part = ""
+    lines = text.split('\n')
+    
+    for line in lines:
+        # Если добавление строки не превысит лимит
+        if len(current_part) + len(line) + 1 <= max_length:
+            if current_part:
+                current_part += '\n' + line
+            else:
+                current_part = line
+        else:
+            # Сохраняем текущую часть и начинаем новую
+            if current_part:
+                parts.append(current_part)
+            current_part = line
+    
+    # Добавляем последнюю часть
+    if current_part:
+        parts.append(current_part)
+    
+    return parts
+
+
+async def send_text_with_photo(message, photo_id: str, text: str, keyboard=None, max_length: int = 4000):
+    """Отправляет текст с фото, разбивая длинный текст на части"""
+    text_parts = split_text_for_caption(text, max_length)
+    
+    if len(text_parts) == 1:
+        # Короткий текст - отправляем с фото
+        try:
+            if message.photo:
+                await message.edit_media(
+                    media=InputMediaPhoto(media=photo_id, caption=text),
+                    reply_markup=keyboard
+                )
+            else:
+                await message.delete()
+                await message.answer_photo(
+                    photo=photo_id,
+                    caption=text,
+                    reply_markup=keyboard
+                )
+        except Exception as e:
+            print(f"Ошибка отправки с фото: {e}")
+            # Fallback - отправляем без фото
+            if message.photo:
+                await message.delete()
+            await message.answer(text, reply_markup=keyboard)
+    else:
+        # Длинный текст - отправляем частями
+        try:
+            if message.photo:
+                await message.delete()
+            
+            # Отправляем фото с первой частью текста
+            await message.answer_photo(
+                photo=photo_id,
+                caption=text_parts[0],
+                reply_markup=None  # Кнопки только в последнем сообщении
+            )
+            
+            # Отправляем остальные части как обычные сообщения
+            for part in text_parts[1:-1]:
+                await message.answer(part)
+            
+            # Последняя часть с кнопками
+            if text_parts:
+                await message.answer(text_parts[-1], reply_markup=keyboard)
+                
+        except Exception as e:
+            print(f"Ошибка отправки частями: {e}")
+            # Fallback - отправляем все как обычные сообщения
+            if message.photo:
+                await message.delete()
+            
+            for i, part in enumerate(text_parts):
+                if i == len(text_parts) - 1:
+                    # Последняя часть с кнопками
+                    await message.answer(part, reply_markup=keyboard)
+                else:
+                    await message.answer(part)
+
+
 async def format_trainer_card(trainer, current_index: int, total: int) -> str:
     """Форматирование анкеты тренера"""
     # Создаем базовый текст без поля "О себе"
@@ -94,58 +254,53 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int):
     # Проверяем, лайкал ли уже клиент этого тренера
     already_liked = await db.check_like_exists(user_id, trainer_id)
     
-    text = await format_trainer_card(trainer, current_index, len(trainers_ids))
     keyboard = get_trainer_view_keyboard(
         trainer_id, current_index, len(trainers_ids), already_liked
     )
     
-    # Если есть фото, отправляем с фото
+    # Если есть фото, используем умную отправку
     if trainer.photo_id:
-        try:
-            # Дополнительная проверка общей длины текста
-            if len(text) > 4096:
-                print(f"Предупреждение: текст анкеты тренера {trainer.id} превышает 4096 символов: {len(text)}")
-                # Если текст слишком длинный, отправляем без фото
-                if message.photo:
-                    await message.delete()
-                await message.answer(text, reply_markup=keyboard)
-            elif message.photo:
-                # Если сообщение уже содержит фото, обновляем его
-                await message.edit_media(
-                    media=InputMediaPhoto(media=trainer.photo_id, caption=text),
-                    reply_markup=keyboard
-                )
-            else:
-                # Если сообщение текстовое, удаляем его и отправляем новое с фото
-                await message.delete()
-                await message.answer_photo(
-                    photo=trainer.photo_id,
-                    caption=text,
-                    reply_markup=keyboard
-                )
-        except Exception as e:
-            print(f"Ошибка отправки анкеты тренера {trainer.id}: {e}")
-            # В случае ошибки отправляем текстом
+        await send_trainer_card_smart(message, trainer, current_index, len(trainers_ids), keyboard)
+    else:
+        # Без фото - используем умную отправку текста
+        text = await format_trainer_card(trainer, current_index, len(trainers_ids))
+        
+        # Проверяем длину текста
+        if len(text) <= 1024:
+            # Короткий текст - отправляем одним сообщением
             try:
                 if message.photo:
                     await message.delete()
                     await message.answer(text, reply_markup=keyboard)
                 else:
                     await message.edit_text(text, reply_markup=keyboard)
-            except Exception as e2:
-                print(f"Критическая ошибка отправки анкеты тренера {trainer.id}: {e2}")
+            except Exception:
                 await message.answer(text, reply_markup=keyboard)
-    else:
-        # Без фото
-        try:
-            if message.photo:
-                # Если текущее сообщение с фото, а новое без - удаляем и отправляем новое
-                await message.delete()
+        else:
+            # Длинный текст - разделяем по полю "О себе"
+            main_text = (
+                f"<b>{trainer.name}</b>\n"
+                f"Возраст: {trainer.age} лет\n"
+                f"Опыт: {trainer.experience}\n"
+                f"Направление: {trainer.direction}\n\n"
+                f"Анкета {current_index + 1}/{len(trainers_ids)}"
+            )
+            
+            try:
+                if message.photo:
+                    await message.delete()
+                
+                # Отправляем основную часть
+                await message.answer(main_text)
+                
+                # Отправляем описание с кнопками
+                await message.answer(
+                    f"<b>О себе:</b>\n{trainer.about}",
+                    reply_markup=keyboard
+                )
+            except Exception as e:
+                print(f"Ошибка отправки анкеты без фото {trainer.id}: {e}")
                 await message.answer(text, reply_markup=keyboard)
-            else:
-                await message.edit_text(text, reply_markup=keyboard)
-        except Exception:
-            await message.answer(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("next:"))
