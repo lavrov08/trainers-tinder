@@ -497,12 +497,21 @@ async def process_approve(callback: CallbackQuery, bot: Bot, db: Database):
             # Пытаемся найти и обновить предыдущее сообщение
             # Это работает только если сообщения идут подряд
             try:
-                previous_message = await bot.edit_message_text(
+                # Получаем текст предыдущего сообщения и добавляем статус
+                previous_text = callback.message.text.replace("О себе:", "").replace("\n\n✅ <b>ОДОБРЕНО</b>", "").replace("\n\n❌ <b>ОТКЛОНЕНО</b>", "")
+                
+                # Определяем статус для добавления
+                status_text = "\n\n✅ <b>ОДОБРЕНО</b>" if "ОДОБРЕНО" in callback.message.text else "\n\n❌ <b>ОТКЛОНЕНО</b>"
+                
+                # Обновляем предыдущее сообщение
+                await bot.edit_message_text(
                     chat_id=chat_id,
                     message_id=message_id - 1,
-                    text=callback.message.text.replace("О себе:", "О себе:").replace("\n\n✅ <b>ОДОБРЕНО</b>", "") + "\n\n✅ <b>ОДОБРЕНО</b>"
+                    text=previous_text + status_text
                 )
-            except Exception:
+                print(f"DEBUG: Обновили предыдущее админское сообщение {message_id - 1}")
+            except Exception as e:
+                print(f"DEBUG: Не удалось обновить предыдущее админское сообщение: {e}")
                 # Если не удалось найти предыдущее сообщение, игнорируем
                 pass
         except Exception as e:
@@ -571,12 +580,21 @@ async def process_reject(callback: CallbackQuery, bot: Bot, db: Database):
             # Пытаемся найти и обновить предыдущее сообщение
             # Это работает только если сообщения идут подряд
             try:
-                previous_message = await bot.edit_message_text(
+                # Получаем текст предыдущего сообщения и добавляем статус
+                previous_text = callback.message.text.replace("О себе:", "").replace("\n\n✅ <b>ОДОБРЕНО</b>", "").replace("\n\n❌ <b>ОТКЛОНЕНО</b>", "")
+                
+                # Определяем статус для добавления
+                status_text = "\n\n❌ <b>ОТКЛОНЕНО</b>" if "ОТКЛОНЕНО" in callback.message.text else "\n\n✅ <b>ОДОБРЕНО</b>"
+                
+                # Обновляем предыдущее сообщение
+                await bot.edit_message_text(
                     chat_id=chat_id,
                     message_id=message_id - 1,
-                    text=callback.message.text.replace("О себе:", "О себе:").replace("\n\n❌ <b>ОТКЛОНЕНО</b>", "") + "\n\n❌ <b>ОТКЛОНЕНО</b>"
+                    text=previous_text + status_text
                 )
-            except Exception:
+                print(f"DEBUG: Обновили предыдущее админское сообщение {message_id - 1}")
+            except Exception as e:
+                print(f"DEBUG: Не удалось обновить предыдущее админское сообщение: {e}")
                 # Если не удалось найти предыдущее сообщение, игнорируем
                 pass
         except Exception as e:

@@ -45,7 +45,21 @@ async def send_trainer_card_smart(message, trainer, current_index: int, total: i
                 )
                 # Сохраняем ID сообщения для последующего удаления
                 if state:
+                    # Сначала сохраняем текущий ID как предыдущий (если он есть)
+                    data = await state.get_data()
+                    current_message_id = data.get('current_message_id')
+                    current_main_message_id = data.get('current_main_message_id')
+                    
+                    if current_message_id or current_main_message_id:
+                        await state.update_data(
+                            previous_message_id=current_message_id,
+                            previous_main_message_id=current_main_message_id
+                        )
+                        print(f"DEBUG: Сохранили предыдущие ID (одиночное с фото) - main: {current_main_message_id}, about: {current_message_id}")
+                    
+                    # Теперь сохраняем новый ID как текущий
                     await state.update_data(current_message_id=sent_message.message_id)
+                    print(f"DEBUG: Сохранили новый ID одиночного сообщения с фото: {sent_message.message_id}")
         except Exception as e:
             print(f"Ошибка отправки анкеты тренера {trainer.id}: {e}")
             # В случае ошибки отправляем без фото
@@ -67,24 +81,24 @@ async def send_trainer_card_smart(message, trainer, current_index: int, total: i
             if should_delete_previous:
                 # Удаляем предыдущие сообщения если они есть
                 data = await state.get_data() if state else {}
-                previous_message_id = data.get('current_message_id')
-                previous_main_message_id = data.get('current_main_message_id')
+                previous_message_id = data.get('previous_message_id')
+                previous_main_message_id = data.get('previous_main_message_id')
                 
-                print(f"DEBUG: Удаляем сообщения - main: {previous_main_message_id}, about: {previous_message_id}")
+                print(f"DEBUG: Удаляем предыдущие сообщения - main: {previous_main_message_id}, about: {previous_message_id}")
                 
                 if previous_main_message_id:
                     try:
                         await message.bot.delete_message(message.chat.id, previous_main_message_id)
-                        print(f"DEBUG: Успешно удалено основное сообщение {previous_main_message_id}")
+                        print(f"DEBUG: Успешно удалено предыдущее основное сообщение {previous_main_message_id}")
                     except Exception as e:
-                        print(f"DEBUG: Ошибка удаления основного сообщения {previous_main_message_id}: {e}")
+                        print(f"DEBUG: Ошибка удаления предыдущего основного сообщения {previous_main_message_id}: {e}")
                 
                 if previous_message_id:
                     try:
                         await message.bot.delete_message(message.chat.id, previous_message_id)
-                        print(f"DEBUG: Успешно удалено сообщение с кнопками {previous_message_id}")
+                        print(f"DEBUG: Успешно удалено предыдущее сообщение с кнопками {previous_message_id}")
                     except Exception as e:
-                        print(f"DEBUG: Ошибка удаления сообщения с кнопками {previous_message_id}: {e}")
+                        print(f"DEBUG: Ошибка удаления предыдущего сообщения с кнопками {previous_message_id}: {e}")
             
             # Отправляем фото с основной информацией
             main_message = await message.answer_photo(
@@ -100,10 +114,24 @@ async def send_trainer_card_smart(message, trainer, current_index: int, total: i
             
             # Сохраняем ID обоих сообщений для последующего удаления
             if state:
+                # Сначала сохраняем текущие ID как предыдущие (если они есть)
+                data = await state.get_data()
+                current_message_id = data.get('current_message_id')
+                current_main_message_id = data.get('current_main_message_id')
+                
+                if current_message_id or current_main_message_id:
+                    await state.update_data(
+                        previous_message_id=current_message_id,
+                        previous_main_message_id=current_main_message_id
+                    )
+                    print(f"DEBUG: Сохранили предыдущие ID - main: {current_main_message_id}, about: {current_message_id}")
+                
+                # Теперь сохраняем новые ID как текущие
                 await state.update_data(
                     current_message_id=about_message.message_id,
                     current_main_message_id=main_message.message_id
                 )
+                print(f"DEBUG: Сохранили новые ID - main: {main_message.message_id}, about: {about_message.message_id}")
         except Exception as e:
             print(f"Ошибка отправки анкеты тренера {trainer.id}: {e}")
             # В случае ошибки отправляем все текстом
@@ -316,7 +344,21 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int, s
                         await message.delete()
                     sent_message = await message.answer(text, reply_markup=keyboard)
                     # Сохраняем ID сообщения для последующего удаления
+                    # Сначала сохраняем текущий ID как предыдущий (если он есть)
+                    data = await state.get_data()
+                    current_message_id = data.get('current_message_id')
+                    current_main_message_id = data.get('current_main_message_id')
+                    
+                    if current_message_id or current_main_message_id:
+                        await state.update_data(
+                            previous_message_id=current_message_id,
+                            previous_main_message_id=current_main_message_id
+                        )
+                        print(f"DEBUG: Сохранили предыдущие ID (одиночное без фото) - main: {current_main_message_id}, about: {current_message_id}")
+                    
+                    # Теперь сохраняем новый ID как текущий
                     await state.update_data(current_message_id=sent_message.message_id)
+                    print(f"DEBUG: Сохранили новый ID одиночного сообщения без фото: {sent_message.message_id}")
             except Exception:
                 sent_message = await message.answer(text, reply_markup=keyboard)
                 await state.update_data(current_message_id=sent_message.message_id)
@@ -334,24 +376,24 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int, s
                 if should_delete_previous:
                     # Удаляем предыдущие сообщения если они есть
                     data = await state.get_data()
-                    previous_message_id = data.get('current_message_id')
-                    previous_main_message_id = data.get('current_main_message_id')
+                    previous_message_id = data.get('previous_message_id')
+                    previous_main_message_id = data.get('previous_main_message_id')
                     
-                    print(f"DEBUG: Удаляем сообщения (без фото) - main: {previous_main_message_id}, about: {previous_message_id}")
+                    print(f"DEBUG: Удаляем предыдущие сообщения (без фото) - main: {previous_main_message_id}, about: {previous_message_id}")
                     
                     if previous_main_message_id:
                         try:
                             await message.bot.delete_message(message.chat.id, previous_main_message_id)
-                            print(f"DEBUG: Успешно удалено основное сообщение (без фото) {previous_main_message_id}")
+                            print(f"DEBUG: Успешно удалено предыдущее основное сообщение (без фото) {previous_main_message_id}")
                         except Exception as e:
-                            print(f"DEBUG: Ошибка удаления основного сообщения (без фото) {previous_main_message_id}: {e}")
+                            print(f"DEBUG: Ошибка удаления предыдущего основного сообщения (без фото) {previous_main_message_id}: {e}")
                     
                     if previous_message_id:
                         try:
                             await message.bot.delete_message(message.chat.id, previous_message_id)
-                            print(f"DEBUG: Успешно удалено сообщение с кнопками (без фото) {previous_message_id}")
+                            print(f"DEBUG: Успешно удалено предыдущее сообщение с кнопками (без фото) {previous_message_id}")
                         except Exception as e:
-                            print(f"DEBUG: Ошибка удаления сообщения с кнопками (без фото) {previous_message_id}: {e}")
+                            print(f"DEBUG: Ошибка удаления предыдущего сообщения с кнопками (без фото) {previous_message_id}: {e}")
                 
                 # Отправляем основную часть
                 main_message = await message.answer(main_text)
@@ -363,10 +405,24 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int, s
                 )
                 
                 # Сохраняем ID обоих сообщений для последующего удаления
+                # Сначала сохраняем текущие ID как предыдущие (если они есть)
+                data = await state.get_data()
+                current_message_id = data.get('current_message_id')
+                current_main_message_id = data.get('current_main_message_id')
+                
+                if current_message_id or current_main_message_id:
+                    await state.update_data(
+                        previous_message_id=current_message_id,
+                        previous_main_message_id=current_main_message_id
+                    )
+                    print(f"DEBUG: Сохранили предыдущие ID (без фото) - main: {current_main_message_id}, about: {current_message_id}")
+                
+                # Теперь сохраняем новые ID как текущие
                 await state.update_data(
                     current_message_id=about_message.message_id,
                     current_main_message_id=main_message.message_id
                 )
+                print(f"DEBUG: Сохранили новые ID (без фото) - main: {main_message.message_id}, about: {about_message.message_id}")
             except Exception as e:
                 print(f"Ошибка отправки анкеты без фото {trainer.id}: {e}")
                 sent_message = await message.answer(text, reply_markup=keyboard)
@@ -483,8 +539,8 @@ async def process_back_to_directions(callback: CallbackQuery, state: FSMContext)
     """Обработчик возврата к выбору направления"""
     # Получаем данные перед очисткой состояния
     data = await state.get_data()
-    previous_message_id = data.get('current_message_id')
-    previous_main_message_id = data.get('current_main_message_id')
+    previous_message_id = data.get('previous_message_id') or data.get('current_message_id')
+    previous_main_message_id = data.get('previous_main_message_id') or data.get('current_main_message_id')
     
     # Очищаем состояние
     await state.clear()
