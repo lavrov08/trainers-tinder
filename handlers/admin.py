@@ -627,11 +627,26 @@ async def process_admin_pending_trainers(callback: CallbackQuery, db: Database):
     
     # Отправляем каждую анкету отдельным сообщением
     for trainer in pending_trainers:
-        # Обрезаем длинное описание для caption (лимит Telegram: 4096 символов)
-        max_about_length = 3000  # Оставляем место для остального текста
+        # Создаем базовый текст без поля "О себе"
+        base_text = (
+            "🆕 <b>Анкета тренера на модерации</b>\n\n"
+            f"<b>Имя:</b> {trainer.name}\n"
+            f"<b>Возраст:</b> {trainer.age} лет\n"
+            f"<b>Опыт:</b> {trainer.experience}\n"
+            f"<b>Направление:</b> {trainer.direction}\n\n"
+            f"<b>О себе:</b>\n"
+            f"<b>Username:</b> @{trainer.username if trainer.username else 'не указан'}\n"
+            f"<b>User ID:</b> {trainer.user_id}"
+        )
+        
+        # Рассчитываем доступное место для описания
+        max_caption_length = 4096
+        available_length = max_caption_length - len(base_text) - 10  # 10 символов запас
+        
+        # Обрезаем описание если нужно
         about_text = trainer.about
-        if len(about_text) > max_about_length:
-            about_text = about_text[:max_about_length] + "..."
+        if len(about_text) > available_length:
+            about_text = about_text[:available_length] + "..."
         
         admin_text = (
             "🆕 <b>Анкета тренера на модерации</b>\n\n"
@@ -645,7 +660,15 @@ async def process_admin_pending_trainers(callback: CallbackQuery, db: Database):
         )
         
         try:
-            if trainer.photo_id:
+            # Дополнительная проверка общей длины текста
+            if len(admin_text) > 4096:
+                print(f"Предупреждение: текст анкеты {trainer.id} превышает 4096 символов: {len(admin_text)}")
+                # Если текст все еще слишком длинный, отправляем без фото
+                await callback.message.answer(
+                    admin_text,
+                    reply_markup=get_moderation_keyboard(trainer.id)
+                )
+            elif trainer.photo_id:
                 await callback.message.answer_photo(
                     photo=trainer.photo_id,
                     caption=admin_text,

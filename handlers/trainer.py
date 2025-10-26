@@ -199,11 +199,26 @@ async def submit_trainer_profile(message: Message, bot: Bot, state: FSMContext, 
     
     # Отправляем анкету всем админам на модерацию
     if ADMIN_IDS:
-        # Обрезаем длинное описание для caption (лимит Telegram: 4096 символов)
-        max_about_length = 3000  # Оставляем место для остального текста
+        # Создаем базовый текст без поля "О себе"
+        base_text = (
+            "🆕 <b>Новая анкета тренера на модерации</b>\n\n"
+            f"<b>Имя:</b> {trainer.name}\n"
+            f"<b>Возраст:</b> {trainer.age} лет\n"
+            f"<b>Опыт:</b> {trainer.experience}\n"
+            f"<b>Направление:</b> {trainer.direction}\n\n"
+            f"<b>О себе:</b>\n"
+            f"<b>Username:</b> @{username if username else 'не указан'}\n"
+            f"<b>User ID:</b> {user_id}"
+        )
+        
+        # Рассчитываем доступное место для описания
+        max_caption_length = 4096
+        available_length = max_caption_length - len(base_text) - 10  # 10 символов запас
+        
+        # Обрезаем описание если нужно
         about_text = trainer.about
-        if len(about_text) > max_about_length:
-            about_text = about_text[:max_about_length] + "..."
+        if len(about_text) > available_length:
+            about_text = about_text[:available_length] + "..."
         
         admin_text = (
             "🆕 <b>Новая анкета тренера на модерации</b>\n\n"
@@ -218,7 +233,16 @@ async def submit_trainer_profile(message: Message, bot: Bot, state: FSMContext, 
         
         for admin_id in ADMIN_IDS:
             try:
-                if trainer.photo_id:
+                # Дополнительная проверка общей длины текста
+                if len(admin_text) > 4096:
+                    print(f"Предупреждение: текст анкеты {trainer_id} превышает 4096 символов: {len(admin_text)}")
+                    # Если текст все еще слишком длинный, отправляем без фото
+                    await bot.send_message(
+                        admin_id,
+                        admin_text,
+                        reply_markup=get_moderation_keyboard(trainer_id)
+                    )
+                elif trainer.photo_id:
                     await bot.send_photo(
                         admin_id,
                         photo=trainer.photo_id,
