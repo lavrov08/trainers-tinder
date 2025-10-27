@@ -8,6 +8,7 @@ from database.models import Trainer
 from keyboards.inline import get_skip_photo_keyboard, get_moderation_keyboard, get_trainer_profile_keyboard, get_confirm_delete_my_profile_keyboard, get_role_keyboard
 from states import TrainerRegistration
 from config import ADMIN_IDS, PLACEMENT_COST
+from services.trainer_card import send_trainer_card
 
 router = Router()
 
@@ -280,36 +281,51 @@ async def view_my_profile(callback: CallbackQuery, db: Database):
         await callback.answer()
         return
     
-    # Формируем текст анкеты
-    profile_text = (
-        f"👤 <b>Ваша анкета</b>\n\n"
-        f"<b>Имя:</b> {trainer.name}\n"
-        f"<b>Возраст:</b> {trainer.age} лет\n"
-        f"<b>Направление:</b> {trainer.direction}\n"
-        f"<b>Опыт:</b> {trainer.experience}\n\n"
-        f"<b>О себе:</b>\n{trainer.about}\n\n"
-        f"<b>Статус:</b> {'✅ Одобрена' if trainer.status == 'approved' else '⏳ На модерации' if trainer.status == 'pending' else '❌ Отклонена'}"
-    )
+    # Определяем статус анкеты
+    status_info = f"<b>Статус:</b> {'✅ Одобрена' if trainer.status == 'approved' else '⏳ На модерации' if trainer.status == 'pending' else '❌ Отклонена'}"
     
+    # Получаем клавиатуру
+    keyboard = get_trainer_profile_keyboard(trainer_id)
+    
+    # Используем централизованный сервис для отправки анкеты
     try:
-        if trainer.photo_id:
-            await callback.message.delete()
-            await callback.message.answer_photo(
-                photo=trainer.photo_id,
-                caption=profile_text,
-                reply_markup=get_trainer_profile_keyboard(trainer_id)
-            )
-        else:
-            await callback.message.edit_text(
-                profile_text,
-                reply_markup=get_trainer_profile_keyboard(trainer_id)
-            )
+        await send_trainer_card(
+            message=callback,
+            trainer=trainer,
+            keyboard=keyboard,
+            prefix="👤 <b>Ваша анкета</b>",
+            status_info=status_info,
+            should_delete_previous=False,
+            state=None  # Не используем state для тренеров
+        )
     except Exception as e:
         print(f"Ошибка при отправке анкеты: {e}")
-        await callback.message.edit_text(
-            profile_text,
-            reply_markup=get_trainer_profile_keyboard(trainer_id)
-        )
+        # Fallback - отправляем простым сообщением
+        try:
+            profile_text = (
+                f"👤 <b>Ваша анкета</b>\n\n"
+                f"<b>Имя:</b> {trainer.name}\n"
+                f"<b>Возраст:</b> {trainer.age} лет\n"
+                f"<b>Направление:</b> {trainer.direction}\n"
+                f"<b>Опыт:</b> {trainer.experience}\n\n"
+                f"<b>О себе:</b>\n{trainer.about}\n\n"
+                f"{status_info}"
+            )
+            
+            # Пытаемся сначала отправить с фото
+            if trainer.photo_id:
+                try:
+                    await callback.message.answer_photo(
+                        photo=trainer.photo_id,
+                        caption=profile_text,
+                        reply_markup=keyboard
+                    )
+                except:
+                    await callback.message.answer(profile_text, reply_markup=keyboard)
+            else:
+                await callback.message.answer(profile_text, reply_markup=keyboard)
+        except Exception as e2:
+            print(f"Критическая ошибка: {e2}")
     
     await callback.answer()
 
