@@ -456,9 +456,6 @@ async def process_like(callback: CallbackQuery, bot: Bot, db: Database, state: F
             f"Осталось лайков: {new_likes_count}",
             show_alert=True
         )
-        
-        # Обновляем клавиатуру
-        await show_trainer(callback.message, db, state, client_id, should_delete_previous=False)
     else:
         # Если не удалось добавить лайк, возвращаем лайк обратно
         await db.add_client_likes(client_id, 1)
