@@ -80,8 +80,10 @@ trainers_tinder/
 │   └── admin.py           # Функции для админа (модерация, статистика, лайки)
 ├── keyboards/             # Клавиатуры
 │   └── inline.py          # Inline-клавиатуры
-└── states/                # FSM состояния
-    └── trainer_registration.py
+├── states/                # FSM состояния
+│   └── trainer_registration.py
+└── services/              # Централизованные сервисы
+    └── trainer_card.py    # Универсальная логика отправки анкет тренеров
 ```
 
 ## Ключевые особенности
