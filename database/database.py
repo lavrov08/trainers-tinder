@@ -317,4 +317,17 @@ class Database:
             ) as cursor:
                 row = await cursor.fetchone()
                 return row is not None
+    
+    async def get_client_liked_trainers(self, client_id: int) -> List[Trainer]:
+        """Получить список тренеров, которых лайкнул клиент"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("""
+                SELECT t.* FROM trainers t
+                INNER JOIN likes l ON t.id = l.trainer_id
+                WHERE l.client_id = ? AND t.status = 'approved'
+                ORDER BY l.created_at DESC
+            """, (client_id,)) as cursor:
+                rows = await cursor.fetchall()
+                return [Trainer(**dict(row)) for row in rows]
 

@@ -4,7 +4,7 @@ from aiogram.types import CallbackQuery, InputMediaPhoto
 from aiogram.fsm.context import FSMContext
 
 from database import Database
-from keyboards.inline import get_directions_keyboard, get_trainer_view_keyboard, get_refill_tariffs_keyboard, get_role_keyboard
+from keyboards.inline import get_directions_keyboard, get_trainer_view_keyboard, get_refill_tariffs_keyboard, get_role_keyboard, get_liked_trainers_keyboard
 from config import ADMIN_IDS, PLACEMENT_COST
 from services.trainer_card import send_trainer_card
 
@@ -542,15 +542,199 @@ async def process_back_to_main_menu(callback: CallbackQuery, state: FSMContext):
         reply_markup=get_role_keyboard()
     )
     await callback.answer()
-async def process_check_likes(callback: CallbackQuery, db: Database):
-    """Обработчик проверки количества лайков"""
+
+
+@router.callback_query(F.data == "check_likes")
+async def process_check_likes(callback: CallbackQuery, db: Database, state: FSMContext):
+    """Обработчик просмотра лайкнутых тренеров"""
     user_id = callback.from_user.id
-    likes_count = await db.get_client_likes(user_id)
     
-    await callback.answer(
-        f"💖 У вас {likes_count} лайков",
-        show_alert=True
+    # Получаем список лайкнутых тренеров
+    liked_trainers = await db.get_client_liked_trainers(user_id)
+    
+    if not liked_trainers:
+        await callback.answer(
+            "😔 У вас пока нет лайкнутых тренеров.\n\n"
+            "Начните просматривать анкеты и ставьте лайки интересным тренерам!",
+            show_alert=True
+        )
+        return
+    
+    # Сохраняем список в state для навигации
+    await state.update_data(
+        liked_trainers=[t.id for t in liked_trainers],
+        liked_page=0
     )
+    
+    # Показываем список тренеров
+    page = 0
+    keyboard = get_liked_trainers_keyboard(liked_trainers, page)
+    
+    text = f"💖 <b>Ваши лайки</b>\n\n"
+    text += f"Всего лайкнутых тренеров: {len(liked_trainers)}\n\n"
+    text += "Выберите тренера для просмотра:"
+    
+    try:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+    except Exception:
+        await callback.message.answer(text, reply_markup=keyboard)
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("liked_page:"))
+async def process_liked_page(callback: CallbackQuery, db: Database, state: FSMContext):
+    """Обработчик навигации по страницам лайкнутых тренеров"""
+    page = int(callback.data.split(":", 1)[1])
+    user_id = callback.from_user.id
+    
+    # Получаем список лайкнутых тренеров из базы данных
+    liked_trainers = await db.get_client_liked_trainers(user_id)
+    
+    if not liked_trainers:
+        await callback.answer("❌ Список тренеров пуст", show_alert=True)
+        return
+    
+    # Сохраняем список в state для навигации
+    await state.update_data(
+        liked_trainers=[t.id for t in liked_trainers],
+        liked_page=page
+    )
+    
+    keyboard = get_liked_trainers_keyboard(liked_trainers, page)
+    
+    text = f"💖 <b>Ваши лайки</b>\n\n"
+    text += f"Всего лайкнутых тренеров: {len(liked_trainers)}\n\n"
+    text += "Выберите тренера для просмотра:"
+    
+    await callback.message.edit_text(text, reply_markup=keyboard)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("view_liked_trainer:"))
+async def process_view_liked_trainer(callback: CallbackQuery, db: Database, state: FSMContext):
+    """Обработчик просмотра лайкнутого тренера"""
+    trainer_id = int(callback.data.split(":", 1)[1])
+    trainer = await db.get_trainer_by_id(trainer_id)
+    
+    if not trainer:
+        await callback.answer("❌ Тренер не найден", show_alert=True)
+        return
+    
+    # Получаем данные перед очисткой состояния (для удаления предыдущих сообщений)
+    data = await state.get_data()
+    previous_message_id = data.get('previous_message_id') or data.get('current_message_id')
+    previous_main_message_id = data.get('previous_main_message_id') or data.get('current_main_message_id')
+    
+    # Удаляем все предыдущие сообщения если они есть
+    if previous_message_id:
+        try:
+            await callback.message.bot.delete_message(callback.message.chat.id, previous_message_id)
+        except Exception:
+            pass
+    if previous_main_message_id:
+        try:
+            await callback.message.bot.delete_message(callback.message.chat.id, previous_main_message_id)
+        except Exception:
+            pass
+    
+    # Показываем анкету тренера с кнопкой возврата к выбору направления
+    keyboard = get_trainer_view_keyboard(
+        trainer_id, 0, 1, already_liked=True, from_likes=False
+    )
+    
+    from services.trainer_card import send_trainer_card
+    try:
+        await send_trainer_card(
+            message=callback.message,
+            trainer=trainer,
+            keyboard=keyboard,
+            prefix="",
+            status_info="Лайкнутый тренер",
+            should_delete_previous=True,
+            state=state
+        )
+    except Exception as e:
+        print(f"Ошибка при отправке анкеты: {e}")
+        # Удаляем старое сообщение если оно с фото
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        text = (
+            f"<b>{trainer.name}</b>\n"
+            f"Возраст: {trainer.age} лет\n"
+            f"Опыт: {trainer.experience}\n"
+            f"Направление: {trainer.direction}\n\n"
+            f"<b>О себе:</b>\n{trainer.about}"
+        )
+        await callback.message.answer(text, reply_markup=keyboard)
+    
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_trainers")
+async def process_back_to_trainers(callback: CallbackQuery, db: Database, state: FSMContext):
+    """Обработчик возврата к списку лайкнутых тренеров"""
+    user_id = callback.from_user.id
+    
+    # Получаем данные перед очисткой состояния (для удаления предыдущих сообщений)
+    data = await state.get_data()
+    previous_message_id = data.get('previous_message_id') or data.get('current_message_id')
+    previous_main_message_id = data.get('previous_main_message_id') or data.get('current_main_message_id')
+    
+    # Удаляем все предыдущие сообщения если они есть
+    if previous_message_id:
+        try:
+            await callback.message.bot.delete_message(callback.message.chat.id, previous_message_id)
+        except Exception:
+            pass
+    if previous_main_message_id:
+        try:
+            await callback.message.bot.delete_message(callback.message.chat.id, previous_main_message_id)
+        except Exception:
+            pass
+    
+    # Получаем список лайкнутых тренеров
+    liked_trainers = await db.get_client_liked_trainers(user_id)
+    
+    if not liked_trainers:
+        # Удаляем старое сообщение если оно с фото
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        await callback.message.answer(
+            "😔 У вас пока нет лайкнутых тренеров.",
+            reply_markup=get_directions_keyboard(prefix="client_direction")
+        )
+        await callback.answer()
+        return
+    
+    # Получаем сохраненную страницу или используем 0
+    page = data.get("liked_page", 0)
+    
+    # Сохраняем список в state для навигации
+    await state.update_data(
+        liked_trainers=[t.id for t in liked_trainers],
+        liked_page=page,
+        from_likes=False
+    )
+    
+    keyboard = get_liked_trainers_keyboard(liked_trainers, page)
+    
+    text = f"💖 <b>Ваши лайки</b>\n\n"
+    text += f"Всего лайкнутых тренеров: {len(liked_trainers)}\n\n"
+    text += "Выберите тренера для просмотра:"
+    
+    # Удаляем старое сообщение если оно с фото
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+    
+    await callback.message.answer(text, reply_markup=keyboard)
+    await callback.answer()
 
 
 @router.callback_query(F.data == "refill_likes")

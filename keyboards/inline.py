@@ -47,7 +47,8 @@ def get_trainer_view_keyboard(
     trainer_id: int,
     current_index: int,
     total: int,
-    already_liked: bool = False
+    already_liked: bool = False,
+    from_likes: bool = False
 ) -> InlineKeyboardMarkup:
     """Клавиатура для просмотра анкеты тренера"""
     builder = InlineKeyboardBuilder()
@@ -97,13 +98,21 @@ def get_trainer_view_keyboard(
         )
     )
     
-    # Четвертый ряд: возврат к выбору направления
-    builder.row(
-        InlineKeyboardButton(
-            text="🔙 К выбору направления",
-            callback_data="back_to_directions"
+    # Четвертый ряд: возврат (к списку лайков или к выбору направления)
+    if from_likes:
+        builder.row(
+            InlineKeyboardButton(
+                text="🔙 К списку лайков",
+                callback_data="back_to_trainers"
+            )
         )
-    )
+    else:
+        builder.row(
+            InlineKeyboardButton(
+                text="🔙 К выбору направления",
+                callback_data="back_to_directions"
+            )
+        )
     
     return builder.as_markup()
 
@@ -374,5 +383,50 @@ def get_confirm_delete_my_profile_keyboard(trainer_id: int) -> InlineKeyboardMar
             callback_data=f"view_my_profile:{trainer_id}"
         )
     )
+    return builder.as_markup()
+
+
+def get_liked_trainers_keyboard(trainers: List, page: int = 0, per_page: int = 5) -> InlineKeyboardMarkup:
+    """Клавиатура со списком лайкнутых тренеров"""
+    builder = InlineKeyboardBuilder()
+    
+    start = page * per_page
+    end = start + per_page
+    page_trainers = trainers[start:end]
+    
+    for trainer in page_trainers:
+        builder.row(
+            InlineKeyboardButton(
+                text=f"{trainer.name} ({trainer.direction})",
+                callback_data=f"view_liked_trainer:{trainer.id}"
+            )
+        )
+    
+    # Навигация по страницам
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="⬅️ Назад",
+                callback_data=f"liked_page:{page-1}"
+            )
+        )
+    if end < len(trainers):
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="➡️ Вперёд",
+                callback_data=f"liked_page:{page+1}"
+            )
+        )
+    if nav_buttons:
+        builder.row(*nav_buttons)
+    
+    builder.row(
+        InlineKeyboardButton(
+            text="🔙 К выбору направления",
+            callback_data="back_to_directions"
+        )
+    )
+    
     return builder.as_markup()
 
