@@ -5,7 +5,7 @@ from typing import List
 from config import TRAINING_DIRECTIONS
 
 
-def get_role_keyboard() -> InlineKeyboardMarkup:
+def get_role_keyboard(is_admin: bool = False) -> InlineKeyboardMarkup:
     """Клавиатура выбора роли"""
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -14,6 +14,10 @@ def get_role_keyboard() -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(text="💪 Я тренер", callback_data="role_trainer")
     )
+    if is_admin:
+        builder.row(
+            InlineKeyboardButton(text="👨‍💼 Администрирование", callback_data="admin_stats")
+        )
     builder.row(
         InlineKeyboardButton(text="📞 Связаться с администратором", url="https://t.me/a1sheet")
     )

@@ -7,14 +7,10 @@ from aiogram.fsm.context import FSMContext
 from database import Database
 from keyboards.inline import get_role_keyboard, get_directions_keyboard, get_trainer_profile_keyboard
 from states import TrainerRegistration
-from config import ADMIN_IDS
+from config import is_admin
+from messages import get_welcome_message
 
 router = Router()
-
-
-def is_admin(user_id: int) -> bool:
-    """Проверка, является ли пользователь администратором"""
-    return user_id in ADMIN_IDS
 
 
 @router.message(CommandStart())
@@ -29,30 +25,23 @@ async def cmd_start(message: Message, db: Database, state: FSMContext):
     await db.add_user(user_id, username)
     
     # Базовое приветствие
-    welcome_text = (
-        "👋 <b>Добро пожаловать в Tinder для тренеров!</b>\n"
-        "<i>made by <b>@cultphysique</b> </i>\n\n"
-        "Спасибо, что подписались на нас! 💪\n\n"
-        "🎁 <b>Подарок для новых подписчиков:</b>\n"
-        "Бесплатная консультация у <b>ЛЮБОГО</b> нашего специалиста по <b>ЛЮБОМУ</b> интересующему вас вопросу!\n\n"
-    )
-
+    welcome_text = get_welcome_message()
     
     # Если пользователь - администратор, добавляем информацию о командах
-    if is_admin(user_id):
-        welcome_text += (
+    admin_user = is_admin(user_id)
+    if admin_user:
+        welcome_text = (
             "👨‍💼 <b>Вы являетесь администратором!</b>\n\n"
             "📋 <b>Доступные команды:</b>\n"
             "/start - Главное меню\n"
             "/admin или /stats - Панель администратора\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
+            + welcome_text
         )
-    
-    welcome_text += "Выберите свою роль:"
     
     await message.answer(
         welcome_text,
-        reply_markup=get_role_keyboard()
+        reply_markup=get_role_keyboard(is_admin=admin_user)
     )
 
 

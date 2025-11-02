@@ -15,7 +15,7 @@ from keyboards.inline import (
     get_back_to_trainer_keyboard,
     get_cancel_keyboard
 )
-from config import ADMIN_IDS, TRAINING_DIRECTIONS
+from config import TRAINING_DIRECTIONS, is_admin
 from states import AdminAddLikes
 
 router = Router()
@@ -77,9 +77,6 @@ async def send_admin_trainer_card_smart(message, trainer, keyboard):
             await message.answer(full_text, reply_markup=keyboard)
 
 
-def is_admin(user_id: int) -> bool:
-    """Проверка, является ли пользователь администратором"""
-    return user_id in ADMIN_IDS
 
 
 @router.message(Command("stats"))

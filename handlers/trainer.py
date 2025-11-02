@@ -7,8 +7,9 @@ from database import Database
 from database.models import Trainer
 from keyboards.inline import get_skip_photo_keyboard, get_moderation_keyboard, get_trainer_profile_keyboard, get_confirm_delete_my_profile_keyboard, get_role_keyboard
 from states import TrainerRegistration
-from config import ADMIN_IDS, PLACEMENT_COST
+from config import ADMIN_IDS, PLACEMENT_COST, is_admin
 from services.trainer_card import send_trainer_card
+from messages import get_welcome_message
 
 router = Router()
 
@@ -432,20 +433,23 @@ async def confirm_delete_my_profile(callback: CallbackQuery, db: Database):
         await db.delete_trainer(trainer_id)
         
         # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        user_id = callback.from_user.id
+        admin_user = is_admin(user_id)
+        
         if callback.message.photo:
             await callback.message.delete()
             await callback.message.answer(
                 "✅ <b>Анкета успешно удалена!</b>\n\n"
                 "Ваша анкета была полностью удалена из системы.\n"
                 "Если захотите создать новую анкету, просто выберите роль тренера снова.",
-                reply_markup=get_role_keyboard()
+                reply_markup=get_role_keyboard(is_admin=admin_user)
             )
         else:
             await callback.message.edit_text(
                 "✅ <b>Анкета успешно удалена!</b>\n\n"
                 "Ваша анкета была полностью удалена из системы.\n"
                 "Если захотите создать новую анкету, просто выберите роль тренера снова.",
-                reply_markup=get_role_keyboard()
+                reply_markup=get_role_keyboard(is_admin=admin_user)
             )
     except Exception as e:
         print(f"Ошибка при удалении анкеты: {e}")
@@ -466,14 +470,12 @@ async def confirm_delete_my_profile(callback: CallbackQuery, db: Database):
 @router.callback_query(F.data == "back_to_main")
 async def back_to_main_menu(callback: CallbackQuery):
     """Обработчик возврата в главное меню"""
+    user_id = callback.from_user.id
+    admin_user = is_admin(user_id)
+    
     await callback.message.edit_text(
-        "👋 <b>Добро пожаловать в Tinder для тренеров!</b>\n"
-        "<i>made by <b>@cultphysique</b> </i>\n\n"
-        "Спасибо, что подписались на нас! 💪\n\n"
-        "🎁 <b>Подарок для новых подписчиков:</b>\n"
-        "Бесплатная консультация у <b>ЛЮБОГО</b> нашего специалиста по <b>ЛЮБОМУ</b> интересующему вас вопросу!\n\n"
-        "Выберите свою роль:",
-        reply_markup=get_role_keyboard()
+        get_welcome_message(),
+        reply_markup=get_role_keyboard(is_admin=admin_user)
     )
     await callback.answer()
 

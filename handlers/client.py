@@ -5,8 +5,9 @@ from aiogram.fsm.context import FSMContext
 
 from database import Database
 from keyboards.inline import get_directions_keyboard, get_trainer_view_keyboard, get_refill_tariffs_keyboard, get_role_keyboard, get_liked_trainers_keyboard
-from config import ADMIN_IDS, PLACEMENT_COST
+from config import ADMIN_IDS, PLACEMENT_COST, is_admin
 from services.trainer_card import send_trainer_card
+from messages import get_welcome_message
 
 router = Router()
 
@@ -542,14 +543,12 @@ async def process_back_to_main_menu(callback: CallbackQuery, state: FSMContext):
     except Exception:
         pass
     
+    user_id = callback.from_user.id
+    admin_user = is_admin(user_id)
+    
     await callback.message.answer(
-        "👋 <b>Добро пожаловать в Tinder для тренеров!</b>\n"
-        "<i>made by <b>@cultphysique</b> </i>\n\n"
-        "Спасибо, что подписались на нас! 💪\n\n"
-        "🎁 <b>Подарок для новых подписчиков:</b>\n"
-        "Бесплатная консультация у <b>ЛЮБОГО</b> нашего специалиста по <b>ЛЮБОМУ</b> интересующему вас вопросу!\n\n"
-        "Выберите свою роль:",
-        reply_markup=get_role_keyboard()
+        get_welcome_message(),
+        reply_markup=get_role_keyboard(is_admin=admin_user)
     )
     await callback.answer()
 

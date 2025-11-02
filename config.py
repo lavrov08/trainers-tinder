@@ -39,3 +39,8 @@ TRAINING_DIRECTIONS = [
     "Растяжка/Стретчинг",
 ]
 
+
+def is_admin(user_id: int) -> bool:
+    """Проверка, является ли пользователь администратором"""
+    return user_id in ADMIN_IDS
+
