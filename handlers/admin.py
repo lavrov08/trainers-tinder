@@ -13,10 +13,12 @@ from keyboards.inline import (
     get_trainer_detail_keyboard,
     get_confirm_delete_keyboard,
     get_back_to_trainer_keyboard,
-    get_cancel_keyboard
+    get_cancel_keyboard,
+    get_role_keyboard
 )
 from config import TRAINING_DIRECTIONS, is_admin
 from states import AdminAddLikes
+from messages import get_welcome_message
 
 router = Router()
 
@@ -131,6 +133,42 @@ async def process_admin_stats(callback: CallbackQuery):
             "📊 <b>Панель администратора</b>\n\n"
             "Выберите действие:",
             reply_markup=get_admin_stats_keyboard()
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_main_menu_from_admin")
+async def back_to_main_menu_from_admin(callback: CallbackQuery, state: FSMContext):
+    """Обработчик возврата в главное меню из панели администратора"""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("❌ Недостаточно прав", show_alert=True)
+        return
+    
+    await state.clear()
+    
+    welcome_text = get_welcome_message()
+    
+    # Добавляем информацию об администраторе
+    welcome_text = (
+        "👨‍💼 <b>Вы являетесь администратором!</b>\n\n"
+        "📋 <b>Доступные команды:</b>\n"
+        "/start - Главное меню\n"
+        "/admin или /stats - Панель администратора\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        + welcome_text
+    )
+    
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(
+            welcome_text,
+            reply_markup=get_role_keyboard(is_admin=True)
+        )
+    else:
+        await callback.message.edit_text(
+            welcome_text,
+            reply_markup=get_role_keyboard(is_admin=True)
         )
     await callback.answer()
 

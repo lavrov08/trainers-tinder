@@ -341,7 +341,7 @@ async def show_trainer(message, db: Database, state: FSMContext, user_id: int, s
         await message.edit_text(
             "😔 Нет доступных тренеров.\n\n"
             "Выберите другое направление:",
-            reply_markup=get_directions_keyboard(prefix="client_direction")
+            reply_markup=get_directions_keyboard(prefix="client_direction", show_back_button=True)
         )
         return
     
@@ -510,7 +510,7 @@ async def process_back_to_directions(callback: CallbackQuery, state: FSMContext)
     
     await callback.message.answer(
         "Выберите интересующее направление тренировок:",
-        reply_markup=get_directions_keyboard(prefix="client_direction")
+        reply_markup=get_directions_keyboard(prefix="client_direction", show_back_button=True)
     )
     await callback.answer()
 
@@ -721,7 +721,7 @@ async def process_back_to_trainers(callback: CallbackQuery, db: Database, state:
             pass
         await callback.message.answer(
             "😔 У вас пока нет лайкнутых тренеров.",
-            reply_markup=get_directions_keyboard(prefix="client_direction")
+            reply_markup=get_directions_keyboard(prefix="client_direction", show_back_button=True)
         )
         await callback.answer()
         return

@@ -69,7 +69,7 @@ async def process_client_role(callback: CallbackQuery, db: Database, state: FSMC
         f"👤 Вы выбрали роль <b>клиента</b>.\n\n"
         f"💖 У вас <b>{likes_count}</b> лайков.\n\n"
         "Выберите интересующее направление тренировок:",
-        reply_markup=get_directions_keyboard(prefix="client_direction")
+        reply_markup=get_directions_keyboard(prefix="client_direction", show_back_button=True)
     )
     await callback.answer()
 

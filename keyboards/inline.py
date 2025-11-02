@@ -176,6 +176,12 @@ def get_admin_stats_keyboard() -> InlineKeyboardMarkup:
             callback_data="admin_pending_trainers"
         )
     )
+    builder.row(
+        InlineKeyboardButton(
+            text="🔙 Главное меню",
+            callback_data="back_to_main_menu_from_admin"
+        )
+    )
     return builder.as_markup()
 
 
