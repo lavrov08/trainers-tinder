@@ -121,11 +121,20 @@ async def process_admin_stats(callback: CallbackQuery):
         await callback.answer("❌ Недостаточно прав", show_alert=True)
         return
     
-    await callback.message.edit_text(
-        "📊 <b>Панель администратора</b>\n\n"
-        "Выберите действие:",
-        reply_markup=get_admin_stats_keyboard()
-    )
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(
+            "📊 <b>Панель администратора</b>\n\n"
+            "Выберите действие:",
+            reply_markup=get_admin_stats_keyboard()
+        )
+    else:
+        await callback.message.edit_text(
+            "📊 <b>Панель администратора</b>\n\n"
+            "Выберите действие:",
+            reply_markup=get_admin_stats_keyboard()
+        )
     await callback.answer()
 
 
@@ -136,10 +145,18 @@ async def process_trainers_by_direction(callback: CallbackQuery):
         await callback.answer("❌ Недостаточно прав", show_alert=True)
         return
     
-    await callback.message.edit_text(
-        "📋 Выберите направление для просмотра тренеров:",
-        reply_markup=get_direction_stats_keyboard()
-    )
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(
+            "📋 Выберите направление для просмотра тренеров:",
+            reply_markup=get_direction_stats_keyboard()
+        )
+    else:
+        await callback.message.edit_text(
+            "📋 Выберите направление для просмотра тренеров:",
+            reply_markup=get_direction_stats_keyboard()
+        )
     await callback.answer()
 
 
@@ -154,11 +171,20 @@ async def process_admin_direction(callback: CallbackQuery, db: Database):
     trainers = await db.get_approved_trainers_by_direction(direction)
     
     if not trainers:
-        await callback.message.edit_text(
-            f"📋 <b>Направление: {direction}</b>\n\n"
-            "Тренеров пока нет.",
-            reply_markup=get_direction_stats_keyboard()
-        )
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer(
+                f"📋 <b>Направление: {direction}</b>\n\n"
+                "Тренеров пока нет.",
+                reply_markup=get_direction_stats_keyboard()
+            )
+        else:
+            await callback.message.edit_text(
+                f"📋 <b>Направление: {direction}</b>\n\n"
+                "Тренеров пока нет.",
+                reply_markup=get_direction_stats_keyboard()
+            )
         await callback.answer()
         return
     
@@ -188,7 +214,12 @@ async def process_admin_direction(callback: CallbackQuery, db: Database):
         )
     )
     
-    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
 
 
@@ -202,11 +233,20 @@ async def process_all_trainers(callback: CallbackQuery, db: Database):
     trainers = await db.get_all_approved_trainers()
     
     if not trainers:
-        await callback.message.edit_text(
-            "📋 <b>Все тренеры</b>\n\n"
-            "Тренеров пока нет.",
-            reply_markup=get_admin_stats_keyboard()
-        )
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer(
+                "📋 <b>Все тренеры</b>\n\n"
+                "Тренеров пока нет.",
+                reply_markup=get_admin_stats_keyboard()
+            )
+        else:
+            await callback.message.edit_text(
+                "📋 <b>Все тренеры</b>\n\n"
+                "Тренеров пока нет.",
+                reply_markup=get_admin_stats_keyboard()
+            )
         await callback.answer()
         return
     
@@ -253,7 +293,12 @@ async def process_all_trainers(callback: CallbackQuery, db: Database):
         )
     )
     
-    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
 
 
@@ -393,12 +438,22 @@ async def process_admin_delete(callback: CallbackQuery):
     
     trainer_id = int(callback.data.split(":", 1)[1])
     
-    await callback.message.edit_text(
-        "⚠️ <b>Подтверждение удаления</b>\n\n"
-        "Вы действительно хотите удалить эту анкету?\n"
-        "Это действие нельзя отменить.",
-        reply_markup=get_confirm_delete_keyboard(trainer_id)
-    )
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(
+            "⚠️ <b>Подтверждение удаления</b>\n\n"
+            "Вы действительно хотите удалить эту анкету?\n"
+            "Это действие нельзя отменить.",
+            reply_markup=get_confirm_delete_keyboard(trainer_id)
+        )
+    else:
+        await callback.message.edit_text(
+            "⚠️ <b>Подтверждение удаления</b>\n\n"
+            "Вы действительно хотите удалить эту анкету?\n"
+            "Это действие нельзя отменить.",
+            reply_markup=get_confirm_delete_keyboard(trainer_id)
+        )
     await callback.answer()
 
 
@@ -426,15 +481,31 @@ async def process_confirm_delete(callback: CallbackQuery, bot: Bot, db: Database
         # Удаляем анкету
         await db.delete_trainer(trainer_id)
         
-        await callback.message.edit_text(
-            f"✅ Анкета тренера <b>{trainer.name}</b> успешно удалена.",
-            reply_markup=get_admin_stats_keyboard()
-        )
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer(
+                f"✅ Анкета тренера <b>{trainer.name}</b> успешно удалена.",
+                reply_markup=get_admin_stats_keyboard()
+            )
+        else:
+            await callback.message.edit_text(
+                f"✅ Анкета тренера <b>{trainer.name}</b> успешно удалена.",
+                reply_markup=get_admin_stats_keyboard()
+            )
     else:
-        await callback.message.edit_text(
-            "❌ Анкета не найдена.",
-            reply_markup=get_admin_stats_keyboard()
-        )
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer(
+                "❌ Анкета не найдена.",
+                reply_markup=get_admin_stats_keyboard()
+            )
+        else:
+            await callback.message.edit_text(
+                "❌ Анкета не найдена.",
+                reply_markup=get_admin_stats_keyboard()
+            )
     
     await callback.answer()
 
@@ -612,15 +683,28 @@ async def process_admin_add_likes_button(callback: CallbackQuery, state: FSMCont
         await callback.answer("❌ Недостаточно прав", show_alert=True)
         return
     
-    await callback.message.edit_text(
-        "💰 <b>Начисление лайков клиенту</b>\n\n"
-        "Введите username клиента (с @) или его User ID:\n\n"
-        "Например:\n"
-        "<code>@john_doe</code>\n"
-        "или\n"
-        "<code>123456789</code>",
-        reply_markup=get_cancel_keyboard()
-    )
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(
+            "💰 <b>Начисление лайков клиенту</b>\n\n"
+            "Введите username клиента (с @) или его User ID:\n\n"
+            "Например:\n"
+            "<code>@john_doe</code>\n"
+            "или\n"
+            "<code>123456789</code>",
+            reply_markup=get_cancel_keyboard()
+        )
+    else:
+        await callback.message.edit_text(
+            "💰 <b>Начисление лайков клиенту</b>\n\n"
+            "Введите username клиента (с @) или его User ID:\n\n"
+            "Например:\n"
+            "<code>@john_doe</code>\n"
+            "или\n"
+            "<code>123456789</code>",
+            reply_markup=get_cancel_keyboard()
+        )
     await state.set_state(AdminAddLikes.waiting_for_user)
     await callback.answer()
 
@@ -634,11 +718,20 @@ async def process_admin_cancel(callback: CallbackQuery, state: FSMContext):
     
     await state.clear()
     
-    await callback.message.edit_text(
-        "📊 <b>Панель администратора</b>\n\n"
-        "Операция отменена. Выберите действие:",
-        reply_markup=get_admin_stats_keyboard()
-    )
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(
+            "📊 <b>Панель администратора</b>\n\n"
+            "Операция отменена. Выберите действие:",
+            reply_markup=get_admin_stats_keyboard()
+        )
+    else:
+        await callback.message.edit_text(
+            "📊 <b>Панель администратора</b>\n\n"
+            "Операция отменена. Выберите действие:",
+            reply_markup=get_admin_stats_keyboard()
+        )
     await callback.answer()
 
 
@@ -770,19 +863,37 @@ async def process_admin_pending_trainers(callback: CallbackQuery, db: Database):
     pending_trainers = await db.get_pending_trainers()
     
     if not pending_trainers:
-        await callback.message.edit_text(
-            "📋 <b>Анкеты на модерации</b>\n\n"
-            "Нет анкет, ожидающих модерации.",
-            reply_markup=get_admin_stats_keyboard()
-        )
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer(
+                "📋 <b>Анкеты на модерации</b>\n\n"
+                "Нет анкет, ожидающих модерации.",
+                reply_markup=get_admin_stats_keyboard()
+            )
+        else:
+            await callback.message.edit_text(
+                "📋 <b>Анкеты на модерации</b>\n\n"
+                "Нет анкет, ожидающих модерации.",
+                reply_markup=get_admin_stats_keyboard()
+            )
         await callback.answer()
         return
     
-    await callback.message.edit_text(
-        f"📋 <b>Анкеты на модерации</b>\n\n"
-        f"Всего анкет: {len(pending_trainers)}\n\n"
-        f"Анкеты отправлены вам в чат."
-    )
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(
+            f"📋 <b>Анкеты на модерации</b>\n\n"
+            f"Всего анкет: {len(pending_trainers)}\n\n"
+            f"Анкеты отправлены вам в чат."
+        )
+    else:
+        await callback.message.edit_text(
+            f"📋 <b>Анкеты на модерации</b>\n\n"
+            f"Всего анкет: {len(pending_trainers)}\n\n"
+            f"Анкеты отправлены вам в чат."
+        )
     
     # Отправляем каждую анкету отдельным сообщением
     for trainer in pending_trainers:

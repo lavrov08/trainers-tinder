@@ -271,13 +271,23 @@ async def view_my_profile(callback: CallbackQuery, db: Database):
     trainer = await db.get_trainer_by_id(trainer_id)
     
     if not trainer:
-        await callback.message.edit_text("❌ Анкета не найдена.")
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer("❌ Анкета не найдена.")
+        else:
+            await callback.message.edit_text("❌ Анкета не найдена.")
         await callback.answer()
         return
     
     # Проверяем, что это анкета текущего пользователя
     if trainer.user_id != user_id:
-        await callback.message.edit_text("❌ У вас нет доступа к этой анкете.")
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer("❌ У вас нет доступа к этой анкете.")
+        else:
+            await callback.message.edit_text("❌ У вас нет доступа к этой анкете.")
         await callback.answer()
         return
     
@@ -340,26 +350,50 @@ async def delete_my_profile(callback: CallbackQuery, db: Database):
     trainer = await db.get_trainer_by_id(trainer_id)
     
     if not trainer:
-        await callback.message.edit_text("❌ Анкета не найдена.")
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer("❌ Анкета не найдена.")
+        else:
+            await callback.message.edit_text("❌ Анкета не найдена.")
         await callback.answer()
         return
     
     # Проверяем, что это анкета текущего пользователя
     if trainer.user_id != user_id:
-        await callback.message.edit_text("❌ У вас нет доступа к этой анкете.")
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer("❌ У вас нет доступа к этой анкете.")
+        else:
+            await callback.message.edit_text("❌ У вас нет доступа к этой анкете.")
         await callback.answer()
         return
     
-    await callback.message.edit_text(
-        "⚠️ <b>Внимание!</b>\n\n"
-        "Вы действительно хотите удалить свою анкету?\n\n"
-        "После удаления:\n"
-        "• Анкета будет полностью удалена из системы\n"
-        "• Все лайки от клиентов будут потеряны\n"
-        "• Вам придется создавать новую анкету с нуля\n\n"
-        "Это действие нельзя отменить!",
-        reply_markup=get_confirm_delete_my_profile_keyboard(trainer_id)
-    )
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer(
+            "⚠️ <b>Внимание!</b>\n\n"
+            "Вы действительно хотите удалить свою анкету?\n\n"
+            "После удаления:\n"
+            "• Анкета будет полностью удалена из системы\n"
+            "• Все лайки от клиентов будут потеряны\n"
+            "• Вам придется создавать новую анкету с нуля\n\n"
+            "Это действие нельзя отменить!",
+            reply_markup=get_confirm_delete_my_profile_keyboard(trainer_id)
+        )
+    else:
+        await callback.message.edit_text(
+            "⚠️ <b>Внимание!</b>\n\n"
+            "Вы действительно хотите удалить свою анкету?\n\n"
+            "После удаления:\n"
+            "• Анкета будет полностью удалена из системы\n"
+            "• Все лайки от клиентов будут потеряны\n"
+            "• Вам придется создавать новую анкету с нуля\n\n"
+            "Это действие нельзя отменить!",
+            reply_markup=get_confirm_delete_my_profile_keyboard(trainer_id)
+        )
     await callback.answer()
 
 
@@ -373,13 +407,23 @@ async def confirm_delete_my_profile(callback: CallbackQuery, db: Database):
     trainer = await db.get_trainer_by_id(trainer_id)
     
     if not trainer:
-        await callback.message.edit_text("❌ Анкета не найдена.")
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer("❌ Анкета не найдена.")
+        else:
+            await callback.message.edit_text("❌ Анкета не найдена.")
         await callback.answer()
         return
     
     # Проверяем, что это анкета текущего пользователя
     if trainer.user_id != user_id:
-        await callback.message.edit_text("❌ У вас нет доступа к этой анкете.")
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer("❌ У вас нет доступа к этой анкете.")
+        else:
+            await callback.message.edit_text("❌ У вас нет доступа к этой анкете.")
         await callback.answer()
         return
     
@@ -387,17 +431,34 @@ async def confirm_delete_my_profile(callback: CallbackQuery, db: Database):
         # Удаляем анкету
         await db.delete_trainer(trainer_id)
         
-        await callback.message.edit_text(
-            "✅ <b>Анкета успешно удалена!</b>\n\n"
-            "Ваша анкета была полностью удалена из системы.\n"
-            "Если захотите создать новую анкету, просто выберите роль тренера снова.",
-            reply_markup=get_role_keyboard()
-        )
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer(
+                "✅ <b>Анкета успешно удалена!</b>\n\n"
+                "Ваша анкета была полностью удалена из системы.\n"
+                "Если захотите создать новую анкету, просто выберите роль тренера снова.",
+                reply_markup=get_role_keyboard()
+            )
+        else:
+            await callback.message.edit_text(
+                "✅ <b>Анкета успешно удалена!</b>\n\n"
+                "Ваша анкета была полностью удалена из системы.\n"
+                "Если захотите создать новую анкету, просто выберите роль тренера снова.",
+                reply_markup=get_role_keyboard()
+            )
     except Exception as e:
         print(f"Ошибка при удалении анкеты: {e}")
-        await callback.message.edit_text(
-            "❌ Произошла ошибка при удалении анкеты. Попробуйте позже."
-        )
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        if callback.message.photo:
+            await callback.message.delete()
+            await callback.message.answer(
+                "❌ Произошла ошибка при удалении анкеты. Попробуйте позже."
+            )
+        else:
+            await callback.message.edit_text(
+                "❌ Произошла ошибка при удалении анкеты. Попробуйте позже."
+            )
     
     await callback.answer()
 

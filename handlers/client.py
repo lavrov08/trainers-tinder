@@ -300,11 +300,21 @@ async def process_client_direction(callback: CallbackQuery, db: Database, state:
     trainers = await db.get_approved_trainers_by_direction(direction)
     
     if not trainers:
-        await callback.message.edit_text(
-            f"😔 К сожалению, пока нет тренеров в направлении <b>{direction}</b>.\n\n"
-            "Попробуйте выбрать другое направление:",
-            reply_markup=get_directions_keyboard(prefix="client_direction", show_back_button=True)
-        )
+        # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+        try:
+            await callback.message.edit_text(
+                f"😔 К сожалению, пока нет тренеров в направлении <b>{direction}</b>.\n\n"
+                "Попробуйте выбрать другое направление:",
+                reply_markup=get_directions_keyboard(prefix="client_direction", show_back_button=True)
+            )
+        except Exception:
+            if callback.message.photo:
+                await callback.message.delete()
+            await callback.message.answer(
+                f"😔 К сожалению, пока нет тренеров в направлении <b>{direction}</b>.\n\n"
+                "Попробуйте выбрать другое направление:",
+                reply_markup=get_directions_keyboard(prefix="client_direction", show_back_button=True)
+            )
         await callback.answer()
         return
     
@@ -607,7 +617,13 @@ async def process_liked_page(callback: CallbackQuery, db: Database, state: FSMCo
     text += f"Всего лайкнутых тренеров: {len(liked_trainers)}\n\n"
     text += "Выберите тренера для просмотра:"
     
-    await callback.message.edit_text(text, reply_markup=keyboard)
+    # Если сообщение содержит фото, удаляем его и отправляем новое текстовое
+    try:
+        await callback.message.edit_text(text, reply_markup=keyboard)
+    except Exception:
+        if callback.message.photo:
+            await callback.message.delete()
+        await callback.message.answer(text, reply_markup=keyboard)
     await callback.answer()
 
 
@@ -775,12 +791,22 @@ async def process_tariff_selection(callback: CallbackQuery, bot: Bot, db: Databa
         return
     
     # Отправляем уведомление клиенту
-    await callback.message.edit_text(
-        f"✅ <b>Запрос на пополнение отправлен!</b>\n\n"
-        f"Тариф: <b>{likes_amount} лайков</b> за {cost} рублей\n\n"
-        f"Менеджер свяжется с вами в ближайшее время для оплаты.\n"
-        f"После подтверждения оплаты лайки будут начислены автоматически."
-    )
+    try:
+        await callback.message.edit_text(
+            f"✅ <b>Запрос на пополнение отправлен!</b>\n\n"
+            f"Тариф: <b>{likes_amount} лайков</b> за {cost} рублей\n\n"
+            f"Менеджер свяжется с вами в ближайшее время для оплаты.\n"
+            f"После подтверждения оплаты лайки будут начислены автоматически."
+        )
+    except Exception:
+        if callback.message.photo:
+            await callback.message.delete()
+        await callback.message.answer(
+            f"✅ <b>Запрос на пополнение отправлен!</b>\n\n"
+            f"Тариф: <b>{likes_amount} лайков</b> за {cost} рублей\n\n"
+            f"Менеджер свяжется с вами в ближайшее время для оплаты.\n"
+            f"После подтверждения оплаты лайки будут начислены автоматически."
+        )
     
     # Отправляем уведомление всем админам
     contact_info = f"@{username}" if username else f"ID: {user_id}"
